@@ -2,6 +2,9 @@ import express from "express"
 import cors from 'cors'
 import dotenv from 'dotenv'
 
+//Importação das Rotas
+
+
 const app = express()
 
 app.use(cors())
