@@ -8,6 +8,7 @@ import loginMaster from './routes/ADM_MASTER/public.js'
 import routePrivateMaster from './routes/ADM_MASTER/private.js'
 //Adm
 import loginAdm from './routes/ADM/public.js'
+import routePrivateAdm from './routes/ADM/private.js'
 
 const app = express()
 app.use(cors())
@@ -21,7 +22,8 @@ app.use(
     loginMaster,
     routePrivateMaster,
     // ADM
-    loginAdm
+    loginAdm,
+    routePrivateAdm
     // User
 )
 
