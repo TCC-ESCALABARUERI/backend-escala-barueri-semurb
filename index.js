@@ -2,8 +2,12 @@ import express from "express"
 import cors from 'cors'
 
 //Importação das Rotas
+
+// Adm Master
 import loginMaster from './routes/ADM_MASTER/public.js'
 import routePrivateMaster from './routes/ADM_MASTER/private.js'
+//Adm
+import loginAdm from './routes/ADM/public.js'
 
 const app = express()
 app.use(cors())
@@ -15,8 +19,9 @@ app.use(
     '/', 
     // ADM Master
     loginMaster,
-    routePrivateMaster
+    routePrivateMaster,
     // ADM
+    loginAdm
     // User
 )
 
