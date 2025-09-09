@@ -151,4 +151,108 @@ route.delete('/deletarFuncionario/:matricula', async (req, res) => {
     }
 })
 
+//Setores
+
+// Criar Setor
+route.post('/cadastrarSetor', async (req, res) => {
+    try {
+        const { nome_setor } = req.body
+
+        if (!nome_setor) {
+            return res.status(400).json({ mensagem: 'Informe o nome do setor' })
+        }
+
+        // Verificar se já existe
+        const { data: setorExistente } = await supabase
+            .from('setor')
+            .select('*')
+            .eq('nome_setor', nome_setor)
+            .maybeSingle()
+
+        if (setorExistente) {
+            return res.status(400).json({ mensagem: 'Setor já cadastrado' })
+        }
+
+        const { data, error } = await supabase
+            .from('setor')
+            .insert([{ nome_setor }])
+            .select()
+
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao cadastrar setor', erro: error })
+        }
+
+        res.status(201).json({ mensagem: 'Setor cadastrado com sucesso', setor: data[0] })
+    } catch (error) {
+        res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+})
+
+
+// Listar Setores
+route.get('/listarSetores', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('setor')
+            .select('id_setor, nome_setor')
+
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao listar setores', erro: error })
+        }
+
+        res.status(200).json({ setores: data })
+    } catch (error) {
+        res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+})
+
+
+// Editar Setor
+route.put('/editarSetor/:id', async (req, res) => {
+    try {
+        const { id } = req.params
+        const { nome_setor } = req.body
+
+        if (!nome_setor) {
+            return res.status(400).json({ mensagem: 'Informe o nome do setor' })
+        }
+
+        const { data, error } = await supabase
+            .from('setor')
+            .update({ nome_setor })
+            .eq('id_setor', id)
+            .select()
+
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao atualizar setor', erro: error })
+        }
+
+        res.status(200).json({ mensagem: 'Setor atualizado com sucesso', setor: data[0] })
+    } catch (error) {
+        res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+})
+
+
+// Deletar Setor
+route.delete('/deletarSetor/:id', async (req, res) => {
+    try {
+        const { id } = req.params
+
+        const { error } = await supabase
+            .from('setor')
+            .delete()
+            .eq('id_setor', id)
+
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao deletar setor', erro: error })
+        }
+
+        res.status(200).json({ mensagem: 'Setor deletado com sucesso' })
+    } catch (error) {
+        res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+})
+
+
 export default route
