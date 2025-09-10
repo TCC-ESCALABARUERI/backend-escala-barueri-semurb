@@ -39,7 +39,7 @@ route.post('/loginAdm', async (req, res) => {
         equipe: user.equipe
       },
       process.env.JWT_SECRET || 'secreta',
-      { expiresIn: '8h' }
+      { expiresIn: '2h' }
     )
 
     return res.status(200).json({ message: 'Login realizado com sucesso', token })

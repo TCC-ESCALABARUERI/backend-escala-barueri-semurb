@@ -114,7 +114,7 @@ route.get('/listarUsuariosSetor/:id_setor', async (req, res) => {
             .eq('id_setor', id_setor)
 
         if (error) return res.status(400).json({ mensagem: 'Erro ao buscar usuários do setor', erro: error })
-        res.status(200).json({ usuarios: data })
+        res.status(200).json({ funcionario: data })
     } catch (error) {
         res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
     }
@@ -168,7 +168,7 @@ route.get('/listarEscalas', async (req, res) => {
     }
 })
 
-// -------------------- TURNO -------------------- //
+// TURNO 
 
 route.post('/cadastrarUsuarioTurno', async (req, res) => {
     try {
