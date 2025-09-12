@@ -5,7 +5,7 @@ import supabase from '../../supabase.js'
 const route = express.Router()
 
 // Cadastrar Funcionário
-route.post('/cadastrarFuncionario', async (req, res) => {
+route.post('/cadastrarFuncionario_master', async (req, res) => {
     try {
         const { matricula, nome, senha, email, telefone, cargo, regiao, equipe } = req.body
 
@@ -57,7 +57,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
 
 
 // Listar Funcionários
-route.get('/listarFuncionarios', async (req, res) => {
+route.get('/listarFuncionarios_master', async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('funcionario')
@@ -102,7 +102,7 @@ route.put('/editarPermissao/:matricula', async (req, res) => {
 
 
 // Editar Funcionário
-route.put('/editarFuncionario/:matricula', async (req, res) => {
+route.put('/editarFuncionario_master/:matricula', async (req, res) => {
     try {
         const { matricula } = req.params
         const { nome, email, telefone, cargo, regiao, equipe } = req.body
@@ -132,7 +132,7 @@ route.put('/editarFuncionario/:matricula', async (req, res) => {
 
 
 // Deletar Funcionário
-route.delete('/deletarFuncionario/:matricula', async (req, res) => {
+route.delete('/deletarFuncionario_master/:matricula', async (req, res) => {
     try {
         const { matricula } = req.params
 
