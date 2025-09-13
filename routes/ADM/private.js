@@ -129,8 +129,53 @@ route.post('/vincularFuncionarioSetor', async (req, res) => {
 })
 
 // cadastrar escala do funcionário
+route.post('/cadastrarEscala', async (req, res) => {
+    try {
+        const obrigatorios = ['matricula_adm', 'matricula_funcionario', 'data_inicio', 'dias_trabalhados', 'dias_n_trabalhados', 'tipo_escala']
+        const campoFaltando = validarCampos(obrigatorios, req.body)
+        if (campoFaltando) {
+            return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
+        }
 
-route.post
+        const { matricula_adm, matricula_funcionario, data_inicio, dias_trabalhados, dias_n_trabalhados, tipo_escala } = req.body
+
+        // Verificar se funcionário existe
+        const { data: funcionarioExistente, error: errorFuncionario } = await supabase
+            .from('funcionario')
+            .select('*')
+            .eq('matricula_funcionario', matricula_funcionario)
+            .maybeSingle()
+
+        if (errorFuncionario) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar funcionário', erro: errorFuncionario })
+        }
+
+        if (!funcionarioExistente) {
+            return res.status(400).json({ mensagem: 'Matrícula do funcionário não encontrada' })
+        }
+
+        //vincular escala ao funcionario
+        const { data, error } = await supabase
+            .from('escala')
+            .insert([{
+                id_funcionario: funcionarioExistente.id,        
+                data_inicio: data_inicio,
+                dias_trabalhados: dias_trabalhados,
+                dias_n_trabalhados: dias_n_trabalhados,
+                tipo_escala: tipo_escala
+            }])
+            .select()
+
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao inserir dados', erro: error })
+        }
+
+        res.status(201).json({ mensagem: 'Escala cadastrada com sucesso', escala: data[0] })
+
+    } catch (error) {
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+})
 
 
 

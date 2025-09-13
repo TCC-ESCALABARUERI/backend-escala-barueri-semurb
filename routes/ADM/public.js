@@ -7,16 +7,16 @@ const route = express.Router()
 
 route.post('/loginAdm', async (req, res) => {
   try {
-    const { matricula, senha } = req.body
+    const { matricula_funcionario, senha } = req.body
 
-    if (!matricula || !senha) {
+    if (!matricula_funcionario || !senha) {
       return res.status(400).json({ mensagem: 'Matrícula e senha são obrigatórias.' })
     }
 
     const { data: user, error } = await supabase
       .from('funcionario')
       .select('*')
-      .eq('matricula_funcionario', matricula)
+      .eq('matricula_funcionario', matricula_funcionario)
       .maybeSingle()
 
     if (error) throw error
