@@ -39,8 +39,22 @@ route.post('/loginFuncionario', async (req, res) => {
             process.env.JWT_SECRET || 'secreta',
             { expiresIn: '2h' }
         )
+
+        // retornar escala do funcionario
+        const { data: escala } = await supabase
+        .from('escala')
+        .select('*')
+        .eq('id_escala', funcionario.id_escala)
+        .maybeSingle()
+
+        // retornar setor do funcionario
+        const { data: setor } = await supabase
+        .from('setor')
+        .select('*')
+        .eq('id_setor', funcionario.id_setor)
+        .maybeSingle()
         
-        return res.status(200).json({ mensagem: 'Login bem-sucedido', funcionario, token })
+        return res.status(200).json({ mensagem: 'Login bem-sucedido', funcionario, token, setor, escala })
     } catch (error) {
         return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
     }

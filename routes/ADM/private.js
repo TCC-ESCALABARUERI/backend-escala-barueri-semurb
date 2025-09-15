@@ -225,6 +225,28 @@ route.post('/cadastrarTurno', async (req, res) => {
             return res.status(400).json({ mensagem: 'Matrícula do funcionário não encontrada' })
         }
 
+        // garantir que o funcionario possua escala antes de buscar turnos
+        if (!funcionarioExistente.id_escala) {
+            return res.status(400).json({ 
+                mensagem: 'Funcionário não possui escala vinculada. Cadastre uma escala antes de adicionar um turno.' 
+            })
+        }
+
+        // verificar se o funcionario ja possui um turno vinculado
+        const { data: turnoExistente, error } = await supabase
+            .from('escala_turno')
+            .select('*')
+            .eq('id_escala', funcionarioExistente.id_escala)
+            .maybeSingle()
+
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar turno do funcionário', erro: error })
+        }
+
+        if (turnoExistente) {
+            return res.status(400).json({ mensagem: 'Funcionário já possui um turno vinculado' })
+        }
+
         // Inserir turno
         const { data: turnoCriado, error: errorTurno } = await supabase
             .from('turno')
@@ -237,20 +259,20 @@ route.post('/cadastrarTurno', async (req, res) => {
         }
 
         // Vincular turno ao funcionário
-        const { data: funcionarioAtualizado, error: errorUpdate } = await supabase
-            .from('funcionario')
-            .update({ id_turno: turnoCriado.id_turno })
-            .eq('matricula_funcionario', matricula_funcionario)
+        const { data: turnoVinculado, error: errorVinculo } = await supabase
+            .from('escala_turno')
+            .insert([{ id_escala: funcionarioExistente.id_escala, id_turno: turnoCriado.id_turno }])
             .select()
+            .single()
 
-        if (errorUpdate) {
-            return res.status(400).json({ mensagem: 'Erro ao vincular turno ao funcionário', erro: errorUpdate })
+        if (errorVinculo) {
+            return res.status(400).json({ mensagem: 'Erro ao vincular turno ao funcionário', erro: errorVinculo })
         }
 
         res.status(201).json({
             mensagem: 'Turno cadastrado e vinculado com sucesso',
             turno: turnoCriado,
-            funcionario: funcionarioAtualizado
+            funcionario: funcionarioExistente
         })
 
     } catch (error) {
@@ -259,5 +281,6 @@ route.post('/cadastrarTurno', async (req, res) => {
 })
 
 // Confirmação de visualização da escala pelo funcionário
+
 
 export default route
