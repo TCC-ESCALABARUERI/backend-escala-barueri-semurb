@@ -258,6 +258,6 @@ route.post('/cadastrarTurno', async (req, res) => {
     }
 })
 
-
+// Confirmação de visualização da escala pelo funcionário
 
 export default route

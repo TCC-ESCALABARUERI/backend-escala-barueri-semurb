@@ -61,7 +61,7 @@ route.get('/listarFuncionarios_master', async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('funcionario')
-            .select('matricula_funcionario, nome, email, telefone, regiao, equipe, cargo, status_permissao')
+            .select()
 
         if (error) {
             return res.status(400).json({ mensagem: 'Erro ao listar funcionários', erro: error })

@@ -40,12 +40,25 @@ route.post('/loginAdm', async (req, res) => {
         }
 
         const token = jwt.sign(
-            { id: funcionario.id, matricula_funcionario: funcionario.matricula_funcionario },
+            { matricula_funcionario: funcionario.matricula_funcionario },
             process.env.JWT_SECRET || 'secreta',
             { expiresIn: '2h' }
         )
+
+        // retornar escala do funcionario
+        const { data: escala } = await supabase
+        .from('escala')
+        .select('*')
+        .eq('id_escala', funcionario.id_escala)
+
+        // retornar setor do funcionario
+        const { data: setor } = await supabase
+        .from('setor')
+        .select('*')
+        .eq('id_setor', funcionario.id_setor)
+
         
-        return res.status(200).json({ mensagem: 'Login bem-sucedido', funcionario, token })
+        return res.status(200).json({ mensagem: 'Login bem-sucedido', funcionario, token, escala, setor })
     } catch (error) {
         return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
     }
