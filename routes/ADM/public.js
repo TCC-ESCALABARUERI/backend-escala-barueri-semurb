@@ -50,12 +50,14 @@ route.post('/loginAdm', async (req, res) => {
         .from('escala')
         .select('*')
         .eq('id_escala', funcionario.id_escala)
+        .maybeSingle()
 
         // retornar setor do funcionario
         const { data: setor } = await supabase
         .from('setor')
         .select('*')
         .eq('id_setor', funcionario.id_setor)
+        .maybeSingle()
 
         
         return res.status(200).json({ mensagem: 'Login bem-sucedido', funcionario, token, escala, setor })
