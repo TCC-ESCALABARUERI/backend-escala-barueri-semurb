@@ -5,57 +5,57 @@ import jwt from 'jsonwebtoken'
 
 const route = express.Router()
 
-// Função para validar campos obrigatórios
-function validarCampos(campos, body) {
-    for (const campo of campos) {
-        if (!body[campo]) return campo
-    }
-    return null
-}
-
-// login de Funcionário
+// Rota de login para funcionário
 route.post('/loginFuncionario', async (req, res) => {
+    // Extrai matrícula e senha 
+    const { matricula_funcionario, senha } = req.body
+
+    // Valida se ambos os campos foram enviados
+    if (!matricula_funcionario || !senha) {
+        return res.status(400).json({ mensagem: 'Matricula e senha são obrigatórios!' })
+    }
+
     try {
-        const obrigatorios = ['matricula_funcionario', 'senha']
-        const campoFaltando = validarCampos(obrigatorios, req.body)
-        if (campoFaltando) return res.status(400).json({ mensagem: `Campo obrigatório ausente: ${campoFaltando}` })
-
-        const { matricula_funcionario, senha } = req.body
-
+        // Busca funcionário pelo número de matrícula
         const { data: funcionario, error } = await supabase
             .from('funcionario')
             .select('*')
             .eq('matricula_funcionario', matricula_funcionario)
             .maybeSingle()
 
+        // Retorna erro se houver problema na consulta
         if (error) return res.status(400).json({ mensagem: 'Erro ao buscar usuário', erro: error })
+
+        // Retorna erro se funcionário não for encontrado
         if (!funcionario) return res.status(404).json({ mensagem: 'Usuário não encontrado' })
 
+        // Compara a senha informada com o hash salvo no banco
         const senhaValida = await bcrypt.compare(senha, funcionario.senha)
         if (!senhaValida) return res.status(401).json({ mensagem: 'Credenciais Inválidas' })
 
+        // Gera token JWT para autenticação
         const token = jwt.sign(
             { id: funcionario.id, matricula_funcionario: funcionario.matricula_funcionario },
             process.env.JWT_SECRET || 'secreta',
             { expiresIn: '2h' }
         )
 
-        // retornar escala do funcionario
-        const { data: escala } = await supabase
-        .from('escala')
-        .select('*')
-        .eq('id_escala', funcionario.id_escala)
-        .maybeSingle()
+        // Busca escala e setor do funcionário em paralelo
+        const [escalaRes, setorRes] = await Promise.all([
+            supabase.from('escala').select('*').eq('id_escala', funcionario.id_escala).maybeSingle(),
+            supabase.from('setor').select('*').eq('id_setor', funcionario.id_setor).maybeSingle()
+        ])
 
-        // retornar setor do funcionario
-        const { data: setor } = await supabase
-        .from('setor')
-        .select('*')
-        .eq('id_setor', funcionario.id_setor)
-        .maybeSingle()
-        
-        return res.status(200).json({ mensagem: 'Login bem-sucedido', funcionario, token, setor, escala })
+        // Retorna dados do funcionário, token, setor e escala
+        return res.status(200).json({
+            mensagem: 'Login bem-sucedido',
+            funcionario,
+            token,
+            setor: setorRes.data,
+            escala: escalaRes.data
+        })
     } catch (error) {
+        // Retorna erro genérico do servidor
         return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
     }
 })

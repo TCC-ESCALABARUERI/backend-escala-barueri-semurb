@@ -15,13 +15,14 @@ function validarCampos(campos, body) {
 // Cadastrar funcionário no setor do adm
 route.post('/cadastrarFuncionario', async (req, res) => {
     try {
-        const obrigatorios = ['matricula_adm', 'matricula_funcionario', 'nome', 'senha', 'email', 'telefone', 'regiao', 'equipe']
+        const obrigatorios = ['matricula_adm', 'matricula_funcionario', 'nome', 'email', 'telefone', 'regiao', 'equipe']
         const campoFaltando = validarCampos(obrigatorios, req.body)
         if (campoFaltando) {
             return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
         }
 
-        const { matricula_adm, matricula_funcionario, nome, senha, email, telefone, cargo, regiao, equipe } = req.body
+        const { matricula_adm, matricula_funcionario, nome, email, telefone, cargo, regiao, equipe } = req.body
+        let { senha } = matricula_funcionario
 
         // Criptografar senha
         const salt = await bcrypt.genSalt(10)
@@ -57,8 +58,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
                 regiao: regiao,
                 equipe: equipe,
                 id_setor: adm.id_setor,
-                cargo: cargo || 'Funcionário',
-                status_permissao: 'Não'
+                cargo: cargo
             }])
             .select()
 
@@ -181,6 +181,11 @@ route.post('/cadastrarEscala', async (req, res) => {
         if (errorUpdate) {
             return res.status(400).json({ mensagem: 'Erro ao vincular escala ao funcionário', erro: errorUpdate })
         }
+
+        // gerar confirmação de leitura da escala
+        await supabase
+            .from('escala_confirmacao')
+            .insert([{ matricula_funcionario: funcionarioExistente.matricula_funcionario, id_escala: escalaCriada.id_escala}])
 
         res.status(201).json({
             mensagem: 'Escala cadastrada e vinculada com sucesso',
