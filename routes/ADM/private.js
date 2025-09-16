@@ -15,14 +15,13 @@ function validarCampos(campos, body) {
 // Cadastrar funcionário no setor do adm
 route.post('/cadastrarFuncionario', async (req, res) => {
     try {
-        const obrigatorios = ['matricula_adm', 'matricula_funcionario', 'nome', 'email', 'telefone', 'regiao', 'equipe']
+        const obrigatorios = ['matricula_adm', 'matricula_funcionario', 'nome', 'senha', 'email', 'telefone', 'regiao', 'equipe']
         const campoFaltando = validarCampos(obrigatorios, req.body)
         if (campoFaltando) {
             return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
         }
 
-        const { matricula_adm, matricula_funcionario, nome, email, telefone, cargo, regiao, equipe } = req.body
-        let { senha } = matricula_funcionario
+        const { matricula_adm, matricula_funcionario, nome, senha, email, telefone, cargo, regiao, equipe } = req.body
 
         // Criptografar senha
         const salt = await bcrypt.genSalt(10)
