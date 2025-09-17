@@ -96,7 +96,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
             regiaoId = regiaoExistente.id_equipe;
         } else {
             //se regiao nao existe cria outra
-            const { data: novaReigao, error: errorNovaRegiao } = await supabase
+            const { data: novaRegiao, error: errorNovaRegiao } = await supabase
                 .from('regiao')
                 .insert([{ nome_regiao: nome_regiao }])
                 .select('id_regiao')
