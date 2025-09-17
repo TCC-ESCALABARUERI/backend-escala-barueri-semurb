@@ -15,7 +15,7 @@ function validarCampos(campos, body) {
 route.get('/equipes', async (req, res) => {
     try {
         const { data, error } = await supabase
-            .from('equipes')
+            .from('equipe')
             .select('id_equipe, nome_equipe');
 
         if (error) {
@@ -60,7 +60,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
          let equipeId;
         //encontrar equipe pelo nome
         const { data: equipeExistente } = await supabase
-            .from('equipes')
+            .from('equipe')
             .select('id_equipe')
             .eq('nome_equipe', nome_equipe)
             .maybeSingle();
@@ -71,7 +71,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
         } else {
             // se equipe n existe cria outra
             const { data: novaEquipe, error: errorNovaEquipe } = await supabase
-                .from('equipes')
+                .from('equipe')
                 .insert([{ nome_equipe: nome_equipe }])
                 .select('id_equipe')
                 .single(); 
@@ -97,7 +97,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
         } else {
             //se regiao nao existe cria outra
             const { data: novaReigao, error: errorNovaRegiao } = await supabase
-                .from('eregiao')
+                .from('regiao')
                 .insert([{ nome_regiao: nome_regiao }])
                 .select('id_regiao')
                 .single(); 
