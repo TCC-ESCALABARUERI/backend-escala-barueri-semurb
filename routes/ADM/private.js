@@ -16,7 +16,7 @@ route.get('/equipes', async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('equipes')
-            .select('id_equipe, nome');
+            .select('id_equipe, nome_equipe');
 
         if (error) {
             return res.status(400).json({ mensagem: 'Erro ao buscar equipes', erro: error });
@@ -31,7 +31,7 @@ route.get('/regiao', async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('regiao')
-            .select('id_regiao, nome');
+            .select('id_regiao, nome_regiao');
 
         if (error) {
             return res.status(400).json({ mensagem: 'Erro ao buscar equipes', erro: error });
@@ -62,7 +62,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
         const { data: equipeExistente } = await supabase
             .from('equipes')
             .select('id_equipe')
-            .eq('nome', nome_equipe)
+            .eq('nome_equipe', nome_equipe)
             .maybeSingle();
 
         if (equipeExistente) {
@@ -72,7 +72,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
             // se equipe n existe cria outra
             const { data: novaEquipe, error: errorNovaEquipe } = await supabase
                 .from('equipes')
-                .insert([{ nome: nome_equipe }])
+                .insert([{ nome_equipe: nome_equipe }])
                 .select('id_equipe')
                 .single(); 
 
@@ -88,7 +88,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
         const { data: regiaoExistente } = await supabase
             .from('regiao')
             .select('id_regiao')
-            .eq('nome', nome_regiao)
+            .eq('nome_regiao', nome_regiao)
             .maybeSingle();
 
         if (regiaoExistente) {
@@ -98,7 +98,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
             //se regiao nao existe cria outra
             const { data: novaReigao, error: errorNovaRegiao } = await supabase
                 .from('eregiao')
-                .insert([{ nome: nome_regiao }])
+                .insert([{ nome_regiao: nome_regiao }])
                 .select('id_regiao')
                 .single(); 
 
