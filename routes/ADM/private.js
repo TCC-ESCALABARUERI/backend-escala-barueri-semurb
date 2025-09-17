@@ -12,21 +12,105 @@ function validarCampos(campos, body) {
     return null
 }
 
+route.get('/equipes', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('equipes')
+            .select('id_equipe, nome');
+
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar equipes', erro: error });
+        }
+        res.status(200).json(data);
+    } catch (error) {
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message });
+    }
+});
+
+route.get('/regiao', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('regiao')
+            .select('id_regiao, nome');
+
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar equipes', erro: error });
+        }
+        res.status(200).json(data);
+    } catch (error) {
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message });
+    }
+});
+
 // Cadastrar funcionário no setor do adm
 route.post('/cadastrarFuncionario', async (req, res) => {
     try {
-        const obrigatorios = ['matricula_adm', 'matricula_funcionario', 'nome', 'senha', 'email', 'telefone', 'regiao', 'equipe']
+        const obrigatorios = ['matricula_adm', 'matricula_funcionario', 'nome', 'senha', 'email', 'telefone', 'nome_regiao', 'nome_equipe']
         const campoFaltando = validarCampos(obrigatorios, req.body)
         if (campoFaltando) {
             return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
         }
 
-        const { matricula_adm, matricula_funcionario, nome, senha, email, telefone, cargo, regiao, equipe } = req.body
+        const { matricula_adm, matricula_funcionario, nome, senha, email, telefone, cargo, nome_regiao, nome_equipe } = req.body
 
         // Criptografar senha
         const salt = await bcrypt.genSalt(10)
         const senhaHash = await bcrypt.hash(senha, salt)
 
+         let equipeId;
+        //encontrar equipe pelo nome
+        const { data: equipeExistente } = await supabase
+            .from('equipes')
+            .select('id_equipe')
+            .eq('nome', nome_equipe)
+            .maybeSingle();
+
+        if (equipeExistente) {
+            //se equipe existe usa o id dela
+            equipeId = equipeExistente.id_equipe;
+        } else {
+            // se equipe n existe cria outra
+            const { data: novaEquipe, error: errorNovaEquipe } = await supabase
+                .from('equipes')
+                .insert([{ nome: nome_equipe }])
+                .select('id_equipe')
+                .single(); 
+
+            if (errorNovaEquipe) {
+                return res.status(400).json({ mensagem: 'Erro ao criar nova equipe', erro: errorNovaEquipe });
+            }
+    
+            equipeId = novaEquipe.id_equipe;
+        }
+
+         let regiaoId;
+        // encontrar regiao pelo nome
+        const { data: regiaoExistente } = await supabase
+            .from('regiao')
+            .select('id_regiao')
+            .eq('nome', nome_regiao)
+            .maybeSingle();
+
+        if (regiaoExistente) {
+            // see regiao existe usa o id
+            regiaoId = regiaoExistente.id_equipe;
+        } else {
+            //se regiao nao existe cria outra
+            const { data: novaReigao, error: errorNovaRegiao } = await supabase
+                .from('eregiao')
+                .insert([{ nome: nome_regiao }])
+                .select('id_regiao')
+                .single(); 
+
+            if (errorNovaRegiao) {
+                return res.status(400).json({ mensagem: 'Erro ao criar nova equipe', erro: errorNovaRegiao });
+            }
+            
+            regiaoId = novaRegiao.id_equipe;
+        }
+
+
+        
         // Verificar se matrícula já existe
         const { data: funcionarioExistente } = await supabase
             .from('funcionario')
@@ -54,10 +138,10 @@ route.post('/cadastrarFuncionario', async (req, res) => {
                 email: email,
                 senha: senhaHash,
                 telefone: telefone,
-                regiao: regiao,
-                equipe: equipe,
+                id_regiao: regiaoId,
+                id_equipe: equipeId,
                 id_setor: adm.id_setor,
-                cargo: cargo
+                cargo: cargo,
             }])
             .select()
 
