@@ -93,7 +93,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
 
         if (regiaoExistente) {
             // see regiao existe usa o id
-            regiaoId = regiaoExistente.id_equipe;
+            regiaoId = regiaoExistente.id_regiao;
         } else {
             //se regiao nao existe cria outra
             const { data: novaRegiao, error: errorNovaRegiao } = await supabase
@@ -103,10 +103,10 @@ route.post('/cadastrarFuncionario', async (req, res) => {
                 .single(); 
 
             if (errorNovaRegiao) {
-                return res.status(400).json({ mensagem: 'Erro ao criar nova equipe', erro: errorNovaRegiao });
+                return res.status(400).json({ mensagem: 'Erro ao criar nova regiao', erro: errorNovaRegiao });
             }
             
-            regiaoId = novaRegiao.id_equipe;
+            regiaoId = novaRegiao.id_regiao;
         }
 
 
