@@ -42,22 +42,6 @@ route.get('/regiao', async (req, res) => {
     }
 })
 
-route.get('/listarFuncionarios', async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('funcionario')
-            .select('*')
-
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao buscar equipes', erro: error })
-        }
-        res.status(200).json(data)
-    } catch (error) {
-        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
-    }
-})
-
-
 //listar funcionarios do setor do adm
 route.get(`/funcionariosSetor/:matricula_adm`, async (req, res) => {
     try {
@@ -337,6 +321,45 @@ route.post('/cadastrarEscala', async (req, res) => {
     }
 })
 
+// listar escalas dos funcionarios do setor
+route.get('/escalasSetor/:matricula_adm', async (req, res) => {
+    try {
+        const { matricula_adm } = req.params
+
+        if (!matricula_adm) {
+            return res.status(400).json({ mensagem: 'Matrícula do ADM é obrigatória' })
+        }
+
+        // buscar setor do adm
+        const { data: adm } = await supabase
+            .from('funcionario')
+            .select('id_setor')
+            .eq('matricula_funcionario', matricula_adm)
+            .maybeSingle()
+
+        if (!adm) {
+            return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
+        }
+
+        // buscar funcionarios do setor com escala
+        const { data: funcionarios, error } = await supabase
+            .from('funcionario')
+            .select('matricula_funcionario, nome, id_escala, escala(id_escala, data_inicio, dias_trabalhados, dias_n_trabalhados, tipo_escala)')
+            .eq('id_setor', adm.id_setor)
+            .not('id_escala', 'is', null) // filtrar apenas funcionarios com escala vinculada
+            .order('nome', { ascending: true })
+
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar funcionários', erro: error })
+        }
+
+        res.status(200).json(funcionarios)
+
+    } catch (error) {
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+})
+
 //cadastrar turno e vincular ao funcionário
 route.post('/cadastrarTurno', async (req, res) => {
     try {
@@ -424,7 +447,6 @@ route.post('/cadastrarTurno', async (req, res) => {
     }
 })
 
-// Confirmação de visualização da escala pelo funcionário
 
 
 export default route
