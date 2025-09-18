@@ -16,31 +16,71 @@ route.get('/equipes', async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('equipe')
-            .select('id_equipe, nome_equipe');
+            .select('id_equipe, nome_equipe')
 
         if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao buscar equipes', erro: error });
+            return res.status(400).json({ mensagem: 'Erro ao buscar equipes', erro: error })
         }
-        res.status(200).json(data);
+        res.status(200).json(data)
     } catch (error) {
-        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message });
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
     }
-});
+})
 
 route.get('/regiao', async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('regiao')
-            .select('id_regiao, nome_regiao');
+            .select('id_regiao, nome_regiao')
 
         if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao buscar equipes', erro: error });
+            return res.status(400).json({ mensagem: 'Erro ao buscar equipes', erro: error })
         }
-        res.status(200).json(data);
+        res.status(200).json(data)
     } catch (error) {
-        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message });
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
     }
-});
+})
+
+//listar funcionarios do setor do adm
+route.get('/funcionariosSetor/:matricula_adm', async (req, res) => {
+    try {
+        const { matricula_adm } = req.params
+
+        if (!matricula_adm) {
+            return res.status(400).json({ mensagem: 'Matrícula do ADM é obrigatória' })
+        }
+
+        // buscar setor do adm
+        const { data: adm } = await supabase
+            .from('funcionario')
+            .select('id_setor')
+            .eq('matricula_funcionario', matricula_adm)
+            .maybeSingle()
+
+        if (!adm) {
+            return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
+        }
+
+        // buscar funcionarios do setor
+        const { data: funcionarios, error } = await supabase
+            .from('funcionario')
+            .select('*')
+            .eq('id_setor', adm.id_setor)
+            .neq('matricula_funcionario', matricula_adm) // Excluir o próprio ADM da lista
+            .order('nome', { ascending: true })
+            
+            
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar funcionários', erro: error })
+        }
+
+        res.status(200).json(funcionarios)
+
+    } catch (error) {
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+})
 
 // Cadastrar funcionário no setor do adm
 route.post('/cadastrarFuncionario', async (req, res) => {
