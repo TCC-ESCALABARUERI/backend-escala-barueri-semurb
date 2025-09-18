@@ -447,6 +447,4 @@ route.post('/cadastrarTurno', async (req, res) => {
     }
 })
 
-
-
 export default route
