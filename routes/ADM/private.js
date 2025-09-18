@@ -42,6 +42,22 @@ route.get('/regiao', async (req, res) => {
     }
 })
 
+route.get('/listarFuncionarios', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('funcionario')
+            .select('*')
+
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar equipes', erro: error })
+        }
+        res.status(200).json(data)
+    } catch (error) {
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+})
+
+
 //listar funcionarios do setor do adm
 route.get('/funcionariosSetor/:matricula_adm', async (req, res) => {
     try {
