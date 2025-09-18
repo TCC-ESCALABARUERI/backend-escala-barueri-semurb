@@ -59,9 +59,9 @@ route.get('/listarFuncionarios', async (req, res) => {
 
 
 //listar funcionarios do setor do adm
-route.get('/funcionariosSetor', async (req, res) => {
+route.get(`/funcionariosSetor/:matricula_adm`, async (req, res) => {
     try {
-        const { matricula_adm } = req.query
+        const { matricula_adm } = req.params
 
         if (!matricula_adm) {
             return res.status(400).json({ mensagem: 'Matrícula do ADM é obrigatória' })
