@@ -12,6 +12,23 @@ function validarCampos(campos, body) {
     return null
 }
 
+route.get('/escalas', async (req, res) => {
+    try{
+    const {data, error} = await supabase
+        .from('escala')
+        .select('*')
+
+       
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar escalas', erro: error })
+        }
+        res.status(200).json(data)
+    } catch (error) {
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+
+})
+
 route.get('/equipes', async (req, res) => {
     try {
         const { data, error } = await supabase
