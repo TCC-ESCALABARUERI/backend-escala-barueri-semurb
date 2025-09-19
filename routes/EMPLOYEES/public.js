@@ -41,9 +41,11 @@ route.post('/loginFuncionario', async (req, res) => {
         )
 
         // Busca escala e setor do funcionário em paralelo
-        const [escalaRes, setorRes] = await Promise.all([
+        const [escalaRes, setorRes, regiaoRes, equipeRes] = await Promise.all([
             supabase.from('escala').select('*').eq('id_escala', funcionario.id_escala).maybeSingle(),
-            supabase.from('setor').select('*').eq('id_setor', funcionario.id_setor).maybeSingle()
+            supabase.from('setor').select('*').eq('id_setor', funcionario.id_setor).maybeSingle(),
+            supabase.from('regiao').select('*').eq('id_regiao', funcionario.id_regiao).maybeSingle(),
+            supabase.from('equipe').select('*').eq('id_equipe', funcionario.id_equipe).maybeSingle()
         ])
 
         // Retorna dados do funcionário, token, setor e escala
@@ -52,7 +54,9 @@ route.post('/loginFuncionario', async (req, res) => {
             funcionario,
             token,
             setor: setorRes.data,
-            escala: escalaRes.data
+            escala: escalaRes.data,
+            regiao: regiaoRes.data,
+            equipe: equipeRes.data
         })
     } catch (error) {
         // Retorna erro genérico do servidor
