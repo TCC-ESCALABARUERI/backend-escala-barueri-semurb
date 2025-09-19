@@ -40,7 +40,7 @@ route.post('/loginFuncionario', async (req, res) => {
             { expiresIn: '2h' }
         )
 
-        // Busca escala e setor do funcionário em paralelo
+        // retorna setor, escala, regiao e equipe do funcionário em paralelo
         const [escalaRes, setorRes, regiaoRes, equipeRes] = await Promise.all([
             supabase.from('escala').select('*').eq('id_escala', funcionario.id_escala).maybeSingle(),
             supabase.from('setor').select('*').eq('id_setor', funcionario.id_setor).maybeSingle(),
