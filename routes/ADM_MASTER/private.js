@@ -7,11 +7,13 @@ const route = express.Router()
 // Cadastrar Funcionário
 route.post('/cadastrarFuncionario_master', async (req, res) => {
     try {
-        const { matricula, nome, senha, email, telefone, cargo, regiao, equipe } = req.body
+        const { matricula_funcionario, nome, email, telefone, cargo, setor, permissao } = req.body
 
-        if (!matricula || !nome || !senha || !email || !telefone || !regiao || !equipe) {
+        if (!matricula_funcionario || !nome || !email || !telefone || !cargo || !setor || !permissao) {
             return res.status(400).json({ mensagem: 'Preencha todos os campos obrigatórios' })
         }
+
+        const senha = matricula_funcionario.toString()
 
         // Criptografar senha
         const salt = await bcrypt.genSalt(10)
@@ -28,6 +30,17 @@ route.post('/cadastrarFuncionario_master', async (req, res) => {
             return res.status(400).json({ mensagem: 'Matrícula já cadastrada' })
         }
 
+        // buscar setor para associar ao funcionário
+        const { data: setorData, error: setorError } = await supabase
+            .from('setor')
+            .select('id_setor')
+            .eq('nome_setor', setor)
+            .maybeSingle()
+            
+        if (setorError || !setorData) {
+            return res.status(400).json({ mensagem: 'Setor não encontrado', erro: setorError })
+        }
+
         // Inserir funcionário
         const { data, error } = await supabase
             .from('funcionario')
@@ -37,10 +50,9 @@ route.post('/cadastrarFuncionario_master', async (req, res) => {
                 email: email,
                 senha: senhaHash,
                 telefone: telefone,
-                regiao: regiao,
-                equipe: equipe,
-                cargo: cargo || 'Funcionário',
-                status_permissao: 'Não'
+                cargo: cargo,
+                setor_id: setorData.id_setor,
+                status_permissao: permissao
             }])
             .select()
 
@@ -55,13 +67,12 @@ route.post('/cadastrarFuncionario_master', async (req, res) => {
     }
 })
 
-
 // Listar Funcionários
 route.get('/listarFuncionarios_master', async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('funcionario')
-            .select()
+            .select('*')
 
         if (error) {
             return res.status(400).json({ mensagem: 'Erro ao listar funcionários', erro: error })
@@ -73,6 +84,37 @@ route.get('/listarFuncionarios_master', async (req, res) => {
     }
 })
 
+// Listar Funcionário por Setor
+route.get('/listarFuncionariosSetor_master/:setor', async (req, res) => {
+    try {
+        const { setor } = req.params
+
+        // buscar setor pelo nome
+        const { data: setorData, error: setorError } = await supabase
+            .from('setor')
+            .select('id_setor')
+            .eq('nome_setor', setor)
+            .maybeSingle()
+
+        if (setorError || !setorData) {
+            return res.status(400).json({ mensagem: 'Setor não encontrado', erro: setorError })
+        }
+
+        // buscar funcionários do setor
+        const { data, error } = await supabase
+            .from('funcionario')
+            .select()
+            .eq('setor_id', setorData.id_setor)
+
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao listar funcionários', erro: error })
+        }
+
+        res.status(200).json({ funcionarios: data })
+    } catch (error) {
+        res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+})
 
 // Editar Permissão
 route.put('/editarPermissao/:matricula', async (req, res) => {
