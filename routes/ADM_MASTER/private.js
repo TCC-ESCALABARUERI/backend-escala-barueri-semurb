@@ -116,6 +116,71 @@ route.get('/listarFuncionariosSetor_master/:setor', async (req, res) => {
     }
 })
 
+// editar funcionário por matrícula
+route.put('/editarFuncionario_master/:matricula', async (req, res) => {
+    try {
+        const { matricula_funcionario } = req.params
+        const { nome, email, senha, telefone, cargo, setor } = req.body
+
+        // dados antigos do funcionario
+        const { data: funcionarioDesatualizado } = await supabase
+            .from('funcionario')
+            .select('*')
+            .eq('matricula_funcionario', matricula_funcionario)
+            .maybeSingle()
+
+        if (!funcionarioDesatualizado) {
+            return res.status(404).json({ mensagem: 'Funcionário não encontrado' })
+        }
+
+        let senhaHash = funcionarioDesatualizado.senha
+
+        // se a senha foi alterada, criptografar a nova senha
+        if (senha && senha !== funcionarioDesatualizado.senha) {
+            const salt = await bcrypt.genSalt(10)
+            senhaHash = await bcrypt.hash(senha, salt)
+        }
+
+        // buscar setor para associar ao funcionário
+        let setor_id = funcionarioDesatualizado.setor_id
+        if (setor) {
+            const { data: setorData, error: setorError } = await supabase
+                .from('setor')
+                .select('id_setor')
+                .eq('nome_setor', setor)
+                .maybeSingle()
+
+            if (setorError || !setorData) {
+                return res.status(400).json({ mensagem: 'Setor não encontrado', erro: setorError })
+            }
+            setor_id = setorData.id_setor
+        }
+
+        // atualizar funcionário
+        const { data: funcionarioAtualizado, error } = await supabase
+            .from('funcionario')
+            .update({
+                nome: nome || funcionarioDesatualizado.nome,
+                email: email || funcionarioDesatualizado.email,
+                senha: senhaHash,
+                telefone: telefone || funcionarioDesatualizado.telefone,
+                cargo: cargo || funcionarioDesatualizado.cargo,
+                setor_id: setor_id,
+            })
+            .eq('matricula_funcionario', matricula_funcionario)
+            .select('*')
+
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao atualizar funcionário', erro: error })
+        }
+
+        res.status(200).json({ mensagem: 'Funcionário atualizado com sucesso', funcionario: funcionarioAtualizado[0] }) 
+    }
+    catch (error) {
+        res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+})
+
 // Editar Permissão
 route.put('/editarPermissao/:matricula', async (req, res) => {
     try {
@@ -130,7 +195,7 @@ route.put('/editarPermissao/:matricula', async (req, res) => {
             .from('funcionario')
             .update({ status_permissao: permissao })
             .eq('matricula_funcionario', matricula)
-            .select()
+            .select('*')
 
         if (error) {
             return res.status(400).json({ mensagem: 'Erro ao atualizar permissão', erro: error })
@@ -142,46 +207,15 @@ route.put('/editarPermissao/:matricula', async (req, res) => {
     }
 })
 
-
-// Editar Funcionário
-route.put('/editarFuncionario_master/:matricula', async (req, res) => {
-    try {
-        const { matricula } = req.params
-        const { nome, email, telefone, cargo, regiao, equipe } = req.body
-
-        const { data, error } = await supabase
-            .from('funcionario')
-            .update({
-                nome: nome,
-                email: email,
-                telefone: telefone,
-                cargo: cargo,
-                regiao: regiao,
-                equipe: equipe
-            })
-            .eq('matricula_funcionario', matricula)
-            .select()
-
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao atualizar funcionário', erro: error })
-        }
-
-        res.status(200).json({ mensagem: 'Funcionário atualizado com sucesso', funcionario: data[0] })
-    } catch (error) {
-        res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
-    }
-})
-
-
 // Deletar Funcionário
 route.delete('/deletarFuncionario_master/:matricula', async (req, res) => {
     try {
-        const { matricula } = req.params
+        const { matricula_funcionario } = req.params
 
         const { error } = await supabase
             .from('funcionario')
             .delete()
-            .eq('matricula_funcionario', matricula)
+            .eq('matricula_funcionario', matricula_funcionario)
 
         if (error) {
             return res.status(400).json({ mensagem: 'Erro ao deletar funcionário', erro: error })
@@ -218,7 +252,7 @@ route.post('/cadastrarSetor', async (req, res) => {
         const { data, error } = await supabase
             .from('setor')
             .insert([{ nome_setor }])
-            .select()
+            .select('*')
 
         if (error) {
             return res.status(400).json({ mensagem: 'Erro ao cadastrar setor', erro: error })
@@ -263,7 +297,7 @@ route.put('/editarSetor/:id', async (req, res) => {
             .from('setor')
             .update({ nome_setor })
             .eq('id_setor', id)
-            .select()
+            .select('*')
 
         if (error) {
             return res.status(400).json({ mensagem: 'Erro ao atualizar setor', erro: error })
