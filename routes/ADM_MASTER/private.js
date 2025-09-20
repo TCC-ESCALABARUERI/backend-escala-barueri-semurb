@@ -7,9 +7,9 @@ const route = express.Router()
 // Cadastrar Funcionário
 route.post('/cadastrarFuncionario_master', async (req, res) => {
     try {
-        const { matricula_funcionario, nome, email, telefone, cargo, setor, permissao } = req.body
+        const { matricula_funcionario, nome, email, telefone, cargo, setor, status_permissao } = req.body
 
-        if (!matricula_funcionario || !nome || !email || !telefone || !cargo || !setor || !permissao) {
+        if (!matricula_funcionario || !nome || !email || !telefone || !cargo || !setor || !status_permissao) {
             return res.status(400).json({ mensagem: 'Preencha todos os campos obrigatórios' })
         }
 
@@ -23,7 +23,7 @@ route.post('/cadastrarFuncionario_master', async (req, res) => {
         const { data: funcionarioExistente } = await supabase
             .from('funcionario')
             .select('*')
-            .eq('matricula_funcionario', matricula)
+            .eq('matricula_funcionario', matricula_funcionario)
             .maybeSingle()
 
         if (funcionarioExistente) {
@@ -45,14 +45,14 @@ route.post('/cadastrarFuncionario_master', async (req, res) => {
         const { data, error } = await supabase
             .from('funcionario')
             .insert([{
-                matricula_funcionario: matricula,
+                matricula_funcionario: matricula_funcionario,
                 nome: nome,
                 email: email,
                 senha: senhaHash,
                 telefone: telefone,
                 cargo: cargo,
-                setor_id: setorData.id_setor,
-                status_permissao: permissao
+                id_setor: setorData.id_setor,
+                status_permissao: status_permissao
             }])
             .select()
 
@@ -104,7 +104,7 @@ route.get('/listarFuncionariosSetor_master/:setor', async (req, res) => {
         const { data, error } = await supabase
             .from('funcionario')
             .select()
-            .eq('setor_id', setorData.id_setor)
+            .eq('id_setor', setorData.id_setor)
 
         if (error) {
             return res.status(400).json({ mensagem: 'Erro ao listar funcionários', erro: error })
@@ -117,7 +117,7 @@ route.get('/listarFuncionariosSetor_master/:setor', async (req, res) => {
 })
 
 // editar funcionário por matrícula
-route.put('/editarFuncionario_master/:matricula', async (req, res) => {
+route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) => {
     try {
         const { matricula_funcionario } = req.params
         const { nome, email, senha, telefone, cargo, setor } = req.body
@@ -165,7 +165,7 @@ route.put('/editarFuncionario_master/:matricula', async (req, res) => {
                 senha: senhaHash,
                 telefone: telefone || funcionarioDesatualizado.telefone,
                 cargo: cargo || funcionarioDesatualizado.cargo,
-                setor_id: setor_id,
+                id_setor: setor_id,
             })
             .eq('matricula_funcionario', matricula_funcionario)
             .select('*')
@@ -182,19 +182,19 @@ route.put('/editarFuncionario_master/:matricula', async (req, res) => {
 })
 
 // Editar Permissão
-route.put('/editarPermissao/:matricula', async (req, res) => {
+route.put('/editarPermissao/:matricula_funcionario', async (req, res) => {
     try {
-        const { matricula } = req.params
-        const { permissao } = req.body // "Sim" ou "Não"
+        const { matricula_funcionario } = req.params
+        const { status_permissao } = req.body // "Sim" ou "Não"
 
-        if (!permissao) {
+        if (!status_permissao) {
             return res.status(400).json({ mensagem: 'Informe a permissão (Sim ou Não)' })
         }
 
         const { data, error } = await supabase
             .from('funcionario')
-            .update({ status_permissao: permissao })
-            .eq('matricula_funcionario', matricula)
+            .update({ status_permissao: stat })
+            .eq('matricula_funcionario', matricula_funcionario)
             .select('*')
 
         if (error) {
@@ -208,7 +208,7 @@ route.put('/editarPermissao/:matricula', async (req, res) => {
 })
 
 // Deletar Funcionário
-route.delete('/deletarFuncionario_master/:matricula', async (req, res) => {
+route.delete('/deletarFuncionario_master/:matricula_funcionario', async (req, res) => {
     try {
         const { matricula_funcionario } = req.params
 
