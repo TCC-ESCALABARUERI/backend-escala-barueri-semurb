@@ -13,12 +13,12 @@ function validarCampos(campos, body) {
 }
 
 route.get('/escalas', async (req, res) => {
-    try{
-    const {data, error} = await supabase
-        .from('escala')
-        .select('*')
+    try {
+        const { data, error } = await supabase
+            .from('escala')
+            .select('*')
 
-       
+
         if (error) {
             return res.status(400).json({ mensagem: 'Erro ao buscar escalas', erro: error })
         }
@@ -86,13 +86,54 @@ route.get(`/funcionariosSetor/:matricula_adm`, async (req, res) => {
             .eq('id_setor', adm.id_setor)
             .neq('matricula_funcionario', matricula_adm) // Excluir o próprio ADM da lista
             .order('nome', { ascending: true })
-            
-            
+
+
         if (error) {
             return res.status(400).json({ mensagem: 'Erro ao buscar funcionários', erro: error })
         }
 
         res.status(200).json(funcionarios)
+
+    } catch (error) {
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+})
+
+// retornar confimação de leitura da escala de todos os funcionarios do setor
+route.get('/confirmacoesLeituraEscala/:matricula_adm', async (req, res) => {
+    try {
+        const { matricula_adm } = req.params
+
+        if (!matricula_adm) {
+            return res.status(400).json({ mensagem: 'Matrícula do ADM é obrigatória' })
+        }
+
+        // buscar setor do adm
+        const { data: adm } = await supabase
+            .from('funcionario')
+            .select('id_setor')
+            .eq('matricula_funcionario', matricula_adm)
+            .maybeSingle()
+
+        if (!adm) {
+            return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
+        }
+
+        // buscar funcionarios do setor com escala
+        const { data: confirmacoes, error } = await supabase
+            .from('funcionario')
+            .select(`matricula_funcionario, nome,
+            escala_confirmacao(id_escala, status, data_confirmacao, 
+            escala(id_escala, data_inicio, dias_trabalhados, dias_n_trabalhados, tipo_escala))`)
+            .eq('id_setor', adm.id_setor)
+            .not('id_escala', 'is', null) // filtrar apenas funcionarios com escala vinculada
+            .order('nome', { ascending: true })
+
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar confirmações de leitura', erro: error })
+        }
+
+        res.status(200).json(confirmacoes)
 
     } catch (error) {
         return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
@@ -114,7 +155,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
         const salt = await bcrypt.genSalt(10)
         const senhaHash = await bcrypt.hash(senha, salt)
 
-         let equipeId;
+        let equipeId;
         //encontrar equipe pelo nome
         const { data: equipeExistente } = await supabase
             .from('equipe')
@@ -131,16 +172,16 @@ route.post('/cadastrarFuncionario', async (req, res) => {
                 .from('equipe')
                 .insert([{ nome_equipe: nome_equipe }])
                 .select('id_equipe')
-                .single(); 
+                .single();
 
             if (errorNovaEquipe) {
                 return res.status(400).json({ mensagem: 'Erro ao criar nova equipe', erro: errorNovaEquipe });
             }
-    
+
             equipeId = novaEquipe.id_equipe;
         }
 
-         let regiaoId;
+        let regiaoId;
         // encontrar regiao pelo nome
         const { data: regiaoExistente } = await supabase
             .from('regiao')
@@ -157,17 +198,17 @@ route.post('/cadastrarFuncionario', async (req, res) => {
                 .from('regiao')
                 .insert([{ nome_regiao: nome_regiao }])
                 .select('id_regiao')
-                .single(); 
+                .single();
 
             if (errorNovaRegiao) {
                 return res.status(400).json({ mensagem: 'Erro ao criar nova regiao', erro: errorNovaRegiao });
             }
-            
+
             regiaoId = novaRegiao.id_regiao;
         }
 
 
-        
+
         // Verificar se matrícula já existe
         const { data: funcionarioExistente } = await supabase
             .from('funcionario')
@@ -325,7 +366,7 @@ route.post('/cadastrarEscala', async (req, res) => {
         // gerar confirmação de leitura da escala
         await supabase
             .from('escala_confirmacao')
-            .insert([{ matricula_funcionario: funcionarioExistente.matricula_funcionario, id_escala: escalaCriada.id_escala}])
+            .insert([{ matricula_funcionario: funcionarioExistente.matricula_funcionario, id_escala: escalaCriada.id_escala }])
 
         res.status(201).json({
             mensagem: 'Escala cadastrada e vinculada com sucesso',
@@ -411,8 +452,8 @@ route.post('/cadastrarTurno', async (req, res) => {
 
         // garantir que o funcionario possua escala antes de buscar turnos
         if (!funcionarioExistente.id_escala) {
-            return res.status(400).json({ 
-                mensagem: 'Funcionário não possui escala vinculada. Cadastre uma escala antes de adicionar um turno.' 
+            return res.status(400).json({
+                mensagem: 'Funcionário não possui escala vinculada. Cadastre uma escala antes de adicionar um turno.'
             })
         }
 
