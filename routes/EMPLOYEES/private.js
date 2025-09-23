@@ -5,8 +5,8 @@ import bcrypt from 'bcrypt'
 const route = express.Router()
 
 // confirmação de leitura da escala
-route.put('/confirmacaoEscala', async (req, res) => {
-    const { matricula_funcionario } = req.body
+route.put('/confirmacaoEscala/:matricula_funcionario', async (req, res) => {
+    const { matricula_funcionario } = req.params
     try {
         //confirmação de leitura da escala 
         const { data: confirmacao, error } = await supabase
