@@ -361,6 +361,36 @@ route.post('/cadastrarEscala', async (req, res) => {
             return res.status(400).json({ mensagem: 'Matrícula do funcionário não encontrada' })
         }
 
+        // verificar setor do adm para garantir que o funcionario pertence ao setor
+        const { data: adm } = await supabase
+            .from('funcionario')
+            .select('id_setor')
+            .eq('matricula_funcionario', matricula_adm)
+            .maybeSingle()
+
+        if (!adm) {
+            return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
+        }
+
+        if (funcionarioExistente.id_setor !== adm.id_setor) {
+            return res.status(400).json({ mensagem: 'Funcionário não pertence ao setor do ADM' })
+        }
+
+        // verificar se o funcionario ja possui uma escala vinculada
+        const { data: escalaExistente, error } = await supabase
+            .from('funcionario')
+            .select('*')
+            .eq('id_escala', funcionarioExistente.id_escala)
+            .maybeSingle()
+
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar escala do funcionário', erro: error })
+        }
+
+        if (escalaExistente) {
+            return res.status(400).json({ mensagem: 'Funcionário já possui uma escala vinculada' })
+        }
+
         // Inserir escala
         const { data: escalaCriada, error: errorEscala } = await supabase
             .from('escala')
