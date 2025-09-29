@@ -12,6 +12,7 @@ function validarCampos(campos, body) {
     return null
 }
 
+// mostrar todas as escalas cadastradas
 route.get('/escalas', async (req, res) => {
     try {
         const { data, error } = await supabase
@@ -143,14 +144,15 @@ route.get('/confirmacoesLeituraEscala/:matricula_adm', async (req, res) => {
 // Cadastrar funcionário no setor do adm
 route.post('/cadastrarFuncionario', async (req, res) => {
     try {
-        const obrigatorios = ['matricula_adm', 'matricula_funcionario', 'nome', 'senha', 'email', 'telefone', 'nome_regiao', 'nome_equipe']
+        const obrigatorios = ['matricula_adm', 'matricula_funcionario', 'nome', 'email', 'telefone', 'nome_regiao', 'nome_equipe']
         const campoFaltando = validarCampos(obrigatorios, req.body)
         if (campoFaltando) {
             return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
         }
 
-        const { matricula_adm, matricula_funcionario, nome, senha, email, telefone, cargo, nome_regiao, nome_equipe } = req.body
-
+        const { matricula_adm, matricula_funcionario, nome, email, telefone, cargo, nome_regiao, nome_equipe } = req.body
+        
+        let senha = toString(matricula_funcionario)
         // Criptografar senha
         const salt = await bcrypt.genSalt(10)
         const senhaHash = await bcrypt.hash(senha, salt)
@@ -245,6 +247,24 @@ route.post('/cadastrarFuncionario', async (req, res) => {
 
         if (error) {
             return res.status(400).json({ mensagem: 'Erro ao inserir dados', erro: error })
+        }
+
+        // gerar primeira notificação
+        const { data: notificacao, error: errorNotificacao } = await supabase
+            .from('notificacoes')
+            .insert([{
+                matricula_funcionario: matricula_funcionario,
+                tipo_notificacao: 'Boas Vindas',
+                mensagem: `Olá ${nome}! Bem vindo ao sistema de gerenciamento de escalas.
+                Sua matrícula é ${matricula_funcionario}. Por favor, altere sua senha após o primeiro acesso.`,
+                lida: false,
+                enviada_em: new Date().toISOString()
+            }])
+            .select()
+            .single()
+
+        if (errorNotificacao) {
+            return res.status(400).json({ mensagem: 'Erro ao criar notificação', erro: errorNotificacao })
         }
 
         res.status(201).json({ mensagem: 'Funcionário cadastrado com sucesso', funcionario: data[0] })
