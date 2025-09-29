@@ -377,15 +377,11 @@ route.post('/cadastrarEscala', async (req, res) => {
         }
 
         // verificar se o funcionario ja possui uma escala vinculada
-        const { data: escalaExistente, error } = await supabase
+        const { data: escalaExistente } = await supabase
             .from('funcionario')
             .select('*')
             .eq('id_escala', funcionarioExistente.id_escala)
             .maybeSingle()
-
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao buscar escala do funcionário', erro: error })
-        }
 
         if (escalaExistente) {
             return res.status(400).json({ mensagem: 'Funcionário já possui uma escala vinculada' })
@@ -417,11 +413,114 @@ route.post('/cadastrarEscala', async (req, res) => {
         await supabase
             .from('escala_confirmacao')
             .insert([{ matricula_funcionario: funcionarioExistente.matricula_funcionario, id_escala: escalaCriada.id_escala }])
+            .select('*')
+            .single()
+
+        // vincular id confirmacao da escala em questão ao funcionario
+        await supabase
+            .from('funcionario')
+            .update({ id_confirmacao: escalaCriada.id_escala })
+            .eq('matricula_funcionario', funcionarioExistente.matricula_funcionario)
+            .select()
 
         res.status(201).json({
             mensagem: 'Escala cadastrada e vinculada com sucesso',
             escala: escalaCriada,
             funcionario: funcionarioAtualizado
+        })
+
+    } catch (error) {
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+})
+
+// rota para alterar uma escala existente
+route.put('/alterarEscala', async (req, res) => {
+    try {
+        const obrigatorios = [
+            'matricula_adm',
+            'matricula_funcionario',
+            'data_inicio',
+            'dias_trabalhados',
+            'dias_n_trabalhados',
+            'tipo_escala'
+        ]
+        const campoFaltando = validarCampos(obrigatorios, req.body)
+        if (campoFaltando) {
+            return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
+        }
+
+        const { matricula_adm, matricula_funcionario, data_inicio, dias_trabalhados, dias_n_trabalhados, tipo_escala } = req.body
+
+        // Verificar se funcionário existe
+        const { data: funcionarioExistente, error: errorFuncionario } = await supabase
+            .from('funcionario')
+            .select('*')
+            .eq('matricula_funcionario', matricula_funcionario)
+            .maybeSingle()
+
+        if (errorFuncionario) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar funcionário', erro: errorFuncionario })
+        }
+        if (!funcionarioExistente) {
+            return res.status(400).json({ mensagem: 'Matrícula do funcionário não encontrada' })
+        }
+
+        // garantir que o funcionario possua escala antes de alterar
+        if (!funcionarioExistente.id_escala) {
+            return res.status(400).json({
+                mensagem: 'Funcionário não possui escala vinculada. Cadastre uma escala antes de tentar alterar.'
+            })
+        }
+
+        // verificar setor do adm para garantir que o funcionario pertence ao setor
+        const { data: adm } = await supabase
+            .from('funcionario')
+            .select('id_setor')
+            .eq('matricula_funcionario', matricula_adm)
+            .maybeSingle()
+
+        if (!adm) {
+            return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
+        }
+
+        if (funcionarioExistente.id_setor !== adm.id_setor) {
+            return res.status(400).json({ mensagem: 'Funcionário não pertence ao setor do ADM' })
+        }
+
+        // Alterar escala
+        const { data: escalaAtualizada, error: errorEscala } = await supabase
+            .from('escala')
+            .update({ data_inicio, dias_trabalhados, dias_n_trabalhados, tipo_escala })
+            .eq('id_escala', funcionarioExistente.id_escala)
+            .select()
+            .single()
+
+        if (errorEscala) {
+            return res.status(400).json({ mensagem: 'Erro ao alterar escala', erro: errorEscala })
+        }
+
+        // gerar nova confirmação de leitura da escala
+        const {data: escalaConfirmacao} = await supabase
+            .from('escala_confirmacao')
+            .insert({ 
+                matricula_funcionario: funcionarioExistente.matricula_funcionario, 
+                id_escala: escalaAtualizada.id_escala, 
+                status: 'Pendente', 
+                data_confirmacao: null })
+            .select('*')
+            .single()
+
+        // garantir que o id_confirmacao do funcionario esteja atualizado
+        await supabase
+            .from('funcionario')
+            .update({ id_confirmacao: escalaConfirmacao.id_confirmacao })
+            .eq('matricula_funcionario', funcionarioExistente.matricula_funcionario)
+            .select()
+
+        res.status(200).json({
+            mensagem: 'Escala alterada com sucesso',
+            escala: escalaAtualizada
         })
 
     } catch (error) {
