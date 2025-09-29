@@ -46,7 +46,7 @@ route.post('/loginFuncionario', async (req, res) => {
             supabase.from('setor').select('*').eq('id_setor', funcionario.id_setor).maybeSingle(),
             supabase.from('regiao').select('*').eq('id_regiao', funcionario.id_regiao).maybeSingle(),
             supabase.from('equipe').select('*').eq('id_equipe', funcionario.id_equipe).maybeSingle(),
-            supabase.from('escala_confirmacao').select('*').eq('matricula_funcionario', funcionario.matricula_funcionario)
+            supabase.from('escala_confirmacao').select('*').eq('matricula_funcionario', funcionario.matricula_funcionario).maybeSingle()
         ])
 
         // Retorna dados do funcionário, token, setor e escala
@@ -57,7 +57,8 @@ route.post('/loginFuncionario', async (req, res) => {
             setor: setorRes.data,
             escala: escalaRes.data,
             regiao: regiaoRes.data,
-            equipe: equipeRes.data
+            equipe: equipeRes.data,
+            confirmacaoEscala: equipeRes.data
         })
     } catch (error) {
         // Retorna erro genérico do servidor
