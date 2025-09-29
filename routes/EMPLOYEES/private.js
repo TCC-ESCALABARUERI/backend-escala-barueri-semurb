@@ -11,6 +11,7 @@ route.put('/confirmacaoEscala/:matricula_funcionario', async (req, res) => {
         //confirmação de leitura da escala 
         const { data: confirmacao, error } = await supabase
             .from('escala_confirmacao')
+            .select('*')
             .update({
                 status: "Confirmado",
                 data_confirmacao: new Date().toISOString()
