@@ -9,7 +9,7 @@ route.put('/confirmacaoEscala/:matricula_funcionario', async (req, res) => {
     const { matricula_funcionario } = req.params
     try {
         //confirmação de leitura da escala 
-        const { data: confirmacao, error } = await supabase
+        const { data: confirmacao, erroConfirmacao } = await supabase
             .from('escala_confirmacao')
             .select('*')
             .update({
@@ -17,9 +17,14 @@ route.put('/confirmacaoEscala/:matricula_funcionario', async (req, res) => {
                 data_confirmacao: new Date().toISOString()
             })
             .eq('matricula_funcionario', matricula_funcionario)
+            .single()
 
-        if (error) {
-            throw error
+        if (erroConfirmacao) {
+            throw erroConfirmacao
+        }
+
+        if (!confirmacao || confirmacao.length === 0) {
+            return res.status(404).json({ message: 'Confirmação não encontrada para o funcionário.' })
         }
 
         res.status(200).json({ message: 'Escala confirmada com sucesso.' })
