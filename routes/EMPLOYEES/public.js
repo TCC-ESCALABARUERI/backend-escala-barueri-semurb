@@ -41,7 +41,7 @@ route.post('/loginFuncionario', async (req, res) => {
         )
 
         // retorna setor, escala, regiao e equipe do funcionário em paralelo
-        const [escalaRes, setorRes, regiaoRes, equipeRes] = await Promise.all([
+        const [escalaRes, setorRes, regiaoRes, equipeRes, confirmacaoRes] = await Promise.all([
             supabase.from('escala').select('*').eq('id_escala', funcionario.id_escala).maybeSingle(),
             supabase.from('setor').select('*').eq('id_setor', funcionario.id_setor).maybeSingle(),
             supabase.from('regiao').select('*').eq('id_regiao', funcionario.id_regiao).maybeSingle(),
@@ -58,7 +58,7 @@ route.post('/loginFuncionario', async (req, res) => {
             escala: escalaRes.data,
             regiao: regiaoRes.data,
             equipe: equipeRes.data,
-            confirmacaoEscala: equipeRes.data
+            confirmacaoEscala: confirmacaoRes.data
         })
     } catch (error) {
         // Retorna erro genérico do servidor

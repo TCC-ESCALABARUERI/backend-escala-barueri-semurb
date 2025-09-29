@@ -9,6 +9,21 @@ route.put('/confirmacaoEscala/:matricula_funcionario', async (req, res) => {
   const { matricula_funcionario } = req.params
 
   try {
+    //verificar se ja foi confirmado
+    const { data: escalaConfirmada, error: errorConfirmacao } = await supabase
+      .from('escala_confirmacao')
+      .select('*')
+      .eq('matricula_funcionario', matricula_funcionario)
+      .eq('status', 'Confirmado')
+
+    if (errorConfirmacao) throw errorConfirmacao
+
+    if (escalaConfirmada && escalaConfirmada.length > 0) {
+      return res.status(400).json({ message: 'Escala já foi confirmada anteriormente.' })
+    }
+
+    //atualizar a confirmação
+
     const { data: confirmacao, error } = await supabase
       .from('escala_confirmacao')
       .update({
