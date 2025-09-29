@@ -6,32 +6,30 @@ const route = express.Router()
 
 // confirmação de leitura da escala
 route.put('/confirmacaoEscala/:matricula_funcionario', async (req, res) => {
-    const { matricula_funcionario } = req.params
-    try {
-        //confirmação de leitura da escala 
-        const { data: confirmacao, erroConfirmacao } = await supabase
-            .from('escala_confirmacao')
-            .select('*')
-            .update({
-                status: "Confirmado",
-                data_confirmacao: new Date().toISOString()
-            })
-            .eq('matricula_funcionario', matricula_funcionario)
-            .single()
+  const { matricula_funcionario } = req.params
 
-        if (erroConfirmacao) {
-            throw erroConfirmacao
-        }
+  try {
+    const { data: confirmacao, error } = await supabase
+      .from('escala_confirmacao')
+      .update({
+        status: "Confirmado",
+        data_confirmacao: new Date().toISOString()
+      })
+      .eq('matricula_funcionario', matricula_funcionario)
+      .select() // <- agora sim, no final
 
-        if (!confirmacao || confirmacao.length === 0) {
-            return res.status(404).json({ message: 'Confirmação não encontrada para o funcionário.' })
-        }
+    if (error) throw error
 
-        res.status(200).json({ message: 'Escala confirmada com sucesso.' })
-    } catch (error) {
-        res.status(500).json({ message: 'Erro ao confirmar escala.', error: error.message })
+    if (!confirmacao || confirmacao.length === 0) {
+      return res.status(404).json({ message: 'Confirmação não encontrada para o funcionário.' })
     }
+
+    res.status(200).json({ message: 'Escala confirmada com sucesso.', confirmacao })
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao confirmar escala.', error: error.message })
+  }
 })
+
 
 // alteração de senha
 
