@@ -410,18 +410,28 @@ route.post('/cadastrarEscala', async (req, res) => {
         }
 
         // gerar confirmação de leitura da escala
-        await supabase
+        const { data: primeiraConfirmacao } = await supabase
             .from('escala_confirmacao')
-            .insert([{ matricula_funcionario: funcionarioExistente.matricula_funcionario, id_escala: escalaCriada.id_escala }])
+            .insert([{ 
+                matricula_funcionario: funcionarioExistente.matricula_funcionario, 
+                id_escala: escalaCriada.id_escala }])
             .select('*')
             .single()
 
+            if (!primeiraConfirmacao) {
+                return res.status(400).json({ mensagem: 'Erro ao criar confirmação de leitura da escala' })
+            }
+
         // vincular id confirmacao da escala em questão ao funcionario
-        await supabase
+        const { data: confirmacaoVinculada } = await supabase
             .from('funcionario')
-            .update({ id_confirmacao: escalaCriada.id_escala })
+            .update({ id_confirmacao: primeiraConfirmacao.id_confirmacao })
             .eq('matricula_funcionario', funcionarioExistente.matricula_funcionario)
             .select()
+
+        if (!confirmacaoVinculada) {
+            return res.status(400).json({ mensagem: 'Erro ao vincular confirmação de leitura ao funcionário' })
+        }
 
         res.status(201).json({
             mensagem: 'Escala cadastrada e vinculada com sucesso',
@@ -506,17 +516,20 @@ route.put('/alterarEscala', async (req, res) => {
             .insert({ 
                 matricula_funcionario: funcionarioExistente.matricula_funcionario, 
                 id_escala: escalaAtualizada.id_escala, 
-                status: 'Pendente', 
                 data_confirmacao: null })
             .select('*')
             .single()
 
         // garantir que o id_confirmacao do funcionario esteja atualizado
-        await supabase
+        const { data: novaConfirmacao } = await supabase
             .from('funcionario')
             .update({ id_confirmacao: escalaConfirmacao.id_confirmacao })
             .eq('matricula_funcionario', funcionarioExistente.matricula_funcionario)
             .select()
+
+        if (!novaConfirmacao) {
+            return res.status(400).json({ mensagem: 'Erro ao atualizar confirmação de leitura da escala no funcionário' })
+        }
 
         res.status(200).json({
             mensagem: 'Escala alterada com sucesso',
