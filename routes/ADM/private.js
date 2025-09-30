@@ -273,9 +273,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
 })
 
 // editar informacoes do funcionario
-route.put('editarFuncionario', async (req, res) => {
-    const infoFuncionario = 
-})
+
 
 // Cadastrar escala e vincular ao funcionário
 route.post('/cadastrarEscala', async (req, res) => {
