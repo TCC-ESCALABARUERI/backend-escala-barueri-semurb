@@ -46,9 +46,11 @@ route.post('/loginFuncionario', async (req, res) => {
         .eq('matricula_funcionario', funcionario.matricula_funcionario)
         .order('data_confirmacao', { ascending: false })
         .limit(1),
-      supabase.from('notificacoes').select('*')
+      supabase.from('notificacoes')
+      .select('*')
       .eq('matricula_funcionario', funcionario.matricula_funcionario)
       .order('enviada_em', { ascending: false })
+      .single()
       
     ])
 
