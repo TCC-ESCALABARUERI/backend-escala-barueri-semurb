@@ -200,7 +200,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
                 .from('regiao')
                 .insert([{ nome_regiao: nome_regiao }])
                 .select('id_regiao')
-                .single();
+                .single()
 
             if (errorNovaRegiao) {
                 return res.status(400).json({ mensagem: 'Erro ao criar nova regiao', erro: errorNovaRegiao });
@@ -209,7 +209,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
             regiaoId = novaRegiao.id_regiao;
         }
 
-
+// editar informacoes do func
 
         // Verificar se matrícula já existe
         const { data: funcionarioExistente } = await supabase
@@ -268,61 +268,6 @@ route.post('/cadastrarFuncionario', async (req, res) => {
         }
 
         res.status(201).json({ mensagem: 'Funcionário cadastrado com sucesso', funcionario: data[0] })
-
-    } catch (error) {
-        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
-    }
-})
-
-// vincular funcionário existente ao setor do adm
-route.post('/vincularFuncionarioSetor', async (req, res) => {
-    try {
-        const obrigatorios = ['matricula_adm', 'matricula_funcionario']
-        const campoFaltando = validarCampos(obrigatorios, req.body)
-        if (campoFaltando) {
-            return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
-        }
-
-        const { matricula_adm, matricula_funcionario } = req.body
-
-        // verificar setor do adm para vincular ao funcionario
-        const { data: adm } = await supabase
-            .from('funcionario')
-            .select('id_setor')
-            .eq('matricula_funcionario', matricula_adm)
-            .maybeSingle()
-
-        if (!adm) {
-            return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
-        }
-
-        // Verificar se funcionário existe
-        const { data: funcionarioExistente, error: errorFuncionario } = await supabase
-            .from('funcionario')
-            .select('*')
-            .eq('matricula_funcionario', matricula_funcionario)
-            .maybeSingle()
-
-        if (errorFuncionario) {
-            return res.status(400).json({ mensagem: 'Erro ao buscar funcionário', erro: errorFuncionario })
-        }
-
-        if (!funcionarioExistente) {
-            return res.status(400).json({ mensagem: 'Matrícula do funcionário não encontrada' })
-        }
-
-        // Atualizar funcionário com o id_setor do adm
-        const { data, error } = await supabase
-            .from('funcionario')
-            .update({ id_setor: adm.id_setor })
-            .eq('matricula_funcionario', matricula_funcionario)
-            .select()
-
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao atualizar dados', erro: error })
-        }
-
-        res.status(200).json({ mensagem: 'Funcionário vinculado ao setor com sucesso', funcionario: data[0] })
 
     } catch (error) {
         return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
@@ -535,45 +480,6 @@ route.put('/alterarEscala', async (req, res) => {
             mensagem: 'Escala alterada com sucesso',
             escala: escalaAtualizada
         })
-
-    } catch (error) {
-        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
-    }
-})
-
-// listar escalas dos funcionarios do setor
-route.get('/escalasSetor/:matricula_adm', async (req, res) => {
-    try {
-        const { matricula_adm } = req.params
-
-        if (!matricula_adm) {
-            return res.status(400).json({ mensagem: 'Matrícula do ADM é obrigatória' })
-        }
-
-        // buscar setor do adm
-        const { data: adm } = await supabase
-            .from('funcionario')
-            .select('id_setor')
-            .eq('matricula_funcionario', matricula_adm)
-            .maybeSingle()
-
-        if (!adm) {
-            return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
-        }
-
-        // buscar funcionarios do setor com escala
-        const { data: funcionarios, error } = await supabase
-            .from('funcionario')
-            .select('matricula_funcionario, nome, id_escala, escala(id_escala, data_inicio, dias_trabalhados, dias_n_trabalhados, tipo_escala)')
-            .eq('id_setor', adm.id_setor)
-            .not('id_escala', 'is', null) // filtrar apenas funcionarios com escala vinculada
-            .order('nome', { ascending: true })
-
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao buscar funcionários', erro: error })
-        }
-
-        res.status(200).json(funcionarios)
 
     } catch (error) {
         return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
