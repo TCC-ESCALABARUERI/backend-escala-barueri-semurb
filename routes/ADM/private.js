@@ -163,11 +163,11 @@ route.post('/cadastrarFuncionario', async (req, res) => {
             .from('equipe')
             .select('id_equipe')
             .eq('nome_equipe', nome_equipe)
-            .maybeSingle();
+            .maybeSingle()
 
         if (equipeExistente) {
             //se equipe existe usa o id dela
-            equipeId = equipeExistente.id_equipe;
+            equipeId = equipeExistente.id_equipe
         } else {
             // se equipe n existe cria outra
             const { data: novaEquipe, error: errorNovaEquipe } = await supabase
@@ -177,10 +177,10 @@ route.post('/cadastrarFuncionario', async (req, res) => {
                 .single();
 
             if (errorNovaEquipe) {
-                return res.status(400).json({ mensagem: 'Erro ao criar nova equipe', erro: errorNovaEquipe });
+                return res.status(400).json({ mensagem: 'Erro ao criar nova equipe', erro: errorNovaEquipe })
             }
 
-            equipeId = novaEquipe.id_equipe;
+            equipeId = novaEquipe.id_equipe
         }
 
         let regiaoId;
@@ -193,7 +193,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
 
         if (regiaoExistente) {
             // see regiao existe usa o id
-            regiaoId = regiaoExistente.id_regiao;
+            regiaoId = regiaoExistente.id_regiao
         } else {
             //se regiao nao existe cria outra
             const { data: novaRegiao, error: errorNovaRegiao } = await supabase
@@ -203,13 +203,11 @@ route.post('/cadastrarFuncionario', async (req, res) => {
                 .single()
 
             if (errorNovaRegiao) {
-                return res.status(400).json({ mensagem: 'Erro ao criar nova regiao', erro: errorNovaRegiao });
+                return res.status(400).json({ mensagem: 'Erro ao criar nova regiao', erro: errorNovaRegiao })
             }
 
-            regiaoId = novaRegiao.id_regiao;
+            regiaoId = novaRegiao.id_regiao
         }
-
-// editar informacoes do func
 
         // Verificar se matrícula já existe
         const { data: funcionarioExistente } = await supabase
@@ -272,6 +270,11 @@ route.post('/cadastrarFuncionario', async (req, res) => {
     } catch (error) {
         return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
     }
+})
+
+// editar informacoes do funcionario
+route.put('editarFuncionario', async (req, res) => {
+    const infoFuncionario = 
 })
 
 // Cadastrar escala e vincular ao funcionário
