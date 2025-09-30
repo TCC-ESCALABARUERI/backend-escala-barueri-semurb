@@ -9,35 +9,44 @@ route.put('/confirmacaoEscala/:matricula_funcionario', async (req, res) => {
   const { matricula_funcionario } = req.params
 
   try {
-    //verificar se ja foi confirmado
-    const { data: escalaConfirmada } = await supabase
+    // Buscar a confirmação mais recente
+    const { data: ultimaConfirmacao, error: erroBusca } = await supabase
       .from('escala_confirmacao')
       .select('*')
       .eq('matricula_funcionario', matricula_funcionario)
-      .eq('status', 'Confirmado')
-      .single()
+      .order('data_confirmacao', { ascending: false }) // pega a mais recente
+      .limit(1)
 
-    if (escalaConfirmada) {
-      return res.status(400).json({ message: 'Escala já foi confirmada anteriormente.' })
+    if (erroBusca) {
+      return res.status(500).json({ message: 'Erro ao buscar confirmação.', error: erroBusca.message })
     }
 
-    //atualizar a confirmação
+    if (ultimaConfirmacao && ultimaConfirmacao.length > 0) {
+      const confirmacao = ultimaConfirmacao[0]
 
-    const { data: confirmacao } = await supabase
-      .from('escala_confirmacao')
-      .update({
-        status: "Confirmado",
-        data_confirmacao: new Date().toISOString()
-      })
-      .eq('matricula_funcionario', matricula_funcionario)
-      .select() 
-      .single()
+      if (confirmacao.status === 'Confirmado') {
+        return res.status(400).json({ message: 'A escala mais recente já foi confirmada.' })
+      }
 
-    if (!confirmacao) {
-      return res.status(404).json({ message: 'Confirmação de escala não encontrada para o funcionário.' })
+      // Atualizar somente a mais recente
+      const { data: confirmada, error: erroUpdate } = await supabase
+        .from('escala_confirmacao')
+        .update({
+          status: 'Confirmado',
+          data_confirmacao: new Date().toISOString()
+        })
+        .eq('id_confirmacao', confirmacao.id_confirmacao) // atualiza só a última
+        .select()
+        .single()
+
+      if (erroUpdate) {
+        return res.status(500).json({ message: 'Erro ao confirmar escala.', error: erroUpdate.message })
+      }
+
+      return res.status(200).json({ message: 'Escala confirmada com sucesso.', confirmada })
     }
 
-    res.status(200).json({ message: 'Escala confirmada com sucesso.', confirmacao })
+    return res.status(404).json({ message: 'Nenhuma escala encontrada para esse funcionário.' })
   } catch (error) {
     res.status(500).json({ message: 'Erro ao confirmar escala.', error: error.message })
   }
