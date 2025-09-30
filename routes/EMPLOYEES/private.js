@@ -10,33 +10,31 @@ route.put('/confirmacaoEscala/:matricula_funcionario', async (req, res) => {
 
   try {
     //verificar se ja foi confirmado
-    const { data: escalaConfirmada, error: errorConfirmacao } = await supabase
+    const { data: escalaConfirmada } = await supabase
       .from('escala_confirmacao')
       .select('*')
       .eq('matricula_funcionario', matricula_funcionario)
       .eq('status', 'Confirmado')
+      .single()
 
-    if (errorConfirmacao) throw errorConfirmacao
-
-    if (escalaConfirmada && escalaConfirmada.length > 0) {
+    if (escalaConfirmada) {
       return res.status(400).json({ message: 'Escala já foi confirmada anteriormente.' })
     }
 
     //atualizar a confirmação
 
-    const { data: confirmacao, error } = await supabase
+    const { data: confirmacao } = await supabase
       .from('escala_confirmacao')
       .update({
         status: "Confirmado",
         data_confirmacao: new Date().toISOString()
       })
       .eq('matricula_funcionario', matricula_funcionario)
-      .select() // <- agora sim, no final
+      .select() 
+      .single()
 
-    if (error) throw error
-
-    if (!confirmacao || confirmacao.length === 0) {
-      return res.status(404).json({ message: 'Confirmação não encontrada para o funcionário.' })
+    if (!confirmacao) {
+      return res.status(404).json({ message: 'Confirmação de escala não encontrada para o funcionário.' })
     }
 
     res.status(200).json({ message: 'Escala confirmada com sucesso.', confirmacao })
