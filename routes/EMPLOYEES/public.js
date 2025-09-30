@@ -36,7 +36,7 @@ route.post('/loginFuncionario', async (req, res) => {
     )
 
     // Busca informações relacionadas em paralelo
-    const [escalaRes, setorRes, regiaoRes, equipeRes, confirmacaoRes] = await Promise.all([
+    const [escalaRes, setorRes, regiaoRes, equipeRes, confirmacaoRes, notificacoesRes] = await Promise.all([
       supabase.from('escala').select('*').eq('id_escala', funcionario.id_escala).maybeSingle(),
       supabase.from('setor').select('*').eq('id_setor', funcionario.id_setor).maybeSingle(),
       supabase.from('regiao').select('*').eq('id_regiao', funcionario.id_regiao).maybeSingle(),
@@ -45,7 +45,11 @@ route.post('/loginFuncionario', async (req, res) => {
         .select('*')
         .eq('matricula_funcionario', funcionario.matricula_funcionario)
         .order('data_confirmacao', { ascending: false })
-        .limit(1)
+        .limit(1),
+      supabase.from('notificacoes').select('*')
+      .eq('matricula_funcionario', funcionario.matricula_funcionario)
+      .order('enviada_em', { ascending: false })
+      
     ])
 
     return res.status(200).json({
@@ -56,7 +60,8 @@ route.post('/loginFuncionario', async (req, res) => {
       escala: escalaRes.data,
       regiao: regiaoRes.data,
       equipe: equipeRes.data,
-      confirmacaoEscala: confirmacaoRes.data?.length > 0 ? confirmacaoRes.data[0] : null
+      confirmacaoEscala: confirmacaoRes.data?.length > 0 ? confirmacaoRes.data[0] : null,
+      notificacoes: notificacoesRes.data
     })
   } catch (error) {
     return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
