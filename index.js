@@ -13,22 +13,35 @@ import routePrivateAdm from './routes/ADM/private.js'
 import loginFuncionario from './routes/EMPLOYEES/public.js'
 import routePrivateFuncionario from './routes/EMPLOYEES/private.js'
 
+// autenticação de token para rotas privadas
+import authToken from './middlewares/authToken.js'
+
 const app = express()
 app.use(cors())
 app.use(express.json()) 
 
 //Definição das Rotas
 
+// Rotas Públicas
 app.use(
     '/', 
     // ADM Master
     loginMaster,
-    routePrivateMaster,
     // ADM
     loginAdm,
-    routePrivateAdm, 
     // User
     loginFuncionario,
+)
+
+// Rotas Privadas
+app.use(
+    '/', 
+    authToken,
+    // ADM Master
+    routePrivateMaster,
+    // ADM
+    routePrivateAdm,
+    // User
     routePrivateFuncionario
 )
 

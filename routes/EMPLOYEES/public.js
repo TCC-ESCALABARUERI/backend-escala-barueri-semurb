@@ -30,9 +30,9 @@ route.post('/loginFuncionario', async (req, res) => {
 
     // Gera token
     const token = jwt.sign(
-      { id: funcionario.id, matricula_funcionario: funcionario.matricula_funcionario },
-      process.env.JWT_SECRET || 'secreta',
-      { expiresIn: '2h' }
+      { matricula_funcionario: funcionario.matricula_funcionario },
+      process.env.JWT_SECRET,
+      { expiresIn: '1m' }
     )
 
     // Busca informações relacionadas em paralelo
@@ -50,7 +50,6 @@ route.post('/loginFuncionario', async (req, res) => {
 
     return res.status(200).json({
       mensagem: 'Login bem-sucedido',
-      funcionario,
       token,
       setor: setorRes.data,
       escala: escalaRes.data,
