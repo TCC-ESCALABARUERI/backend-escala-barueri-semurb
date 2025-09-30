@@ -50,7 +50,6 @@ route.post('/loginFuncionario', async (req, res) => {
 
     return res.status(200).json({
       mensagem: 'Login bem-sucedido',
-      funcionario,
       token,
       setor: setorRes.data,
       escala: escalaRes.data,
