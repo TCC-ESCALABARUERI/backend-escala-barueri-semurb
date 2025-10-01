@@ -32,12 +32,13 @@ route.post('/loginFuncionario', async (req, res) => {
     const token = jwt.sign(
       { matricula_funcionario: funcionario.matricula_funcionario },
       process.env.JWT_SECRET,
-      { expiresIn: '1m' }
+      { expiresIn: '1h' }
     )
 
     // Busca informações relacionadas em paralelo
-    const [escalaRes, setorRes, regiaoRes, equipeRes, confirmacaoRes, notificacoesRes] = await Promise.all([
+    const [escalaRes,turnoRes, setorRes, regiaoRes, equipeRes, confirmacaoRes, notificacoesRes] = await Promise.all([
       supabase.from('escala').select('*').eq('id_escala', funcionario.id_escala).maybeSingle(),
+      supabase.from('turno').select('*').eq('id_turno', funcionario.id_turno).maybeSingle(),
       supabase.from('setor').select('*').eq('id_setor', funcionario.id_setor).maybeSingle(),
       supabase.from('regiao').select('*').eq('id_regiao', funcionario.id_regiao).maybeSingle(),
       supabase.from('equipe').select('*').eq('id_equipe', funcionario.id_equipe).maybeSingle(),
@@ -60,6 +61,7 @@ route.post('/loginFuncionario', async (req, res) => {
       token,
       setor: setorRes.data,
       escala: escalaRes.data,
+      turno: turnoRes.data,
       regiao: regiaoRes.data,
       equipe: equipeRes.data,
       confirmacaoEscala: confirmacaoRes.data?.length > 0 ? confirmacaoRes.data[0] : null,
