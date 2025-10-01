@@ -56,12 +56,17 @@ route.put('/confirmacaoEscala/:matricula_funcionario', async (req, res) => {
 // alteração de senha
 
 route.put('/alterarSenha', async (req, res) => {
-    const { matricula_funcionario, nova_senha } = req.body;
+    const { matricula_funcionario, nova_senha, confirmar_nova_senha } = req.body;
 
     try {
         // validação de entrada
-        if (!matricula_funcionario || !nova_senha) {
+        if (!matricula_funcionario || !nova_senha || !confirmar_nova_senha) {
             return res.status(400).json({ message: 'Matrícula e nova senha são obrigatórias.' });
+        }
+
+        // vericar se ambas a senhas são iguais
+        if (nova_senha != confirmar_nova_senha) {
+          return res.status(400).json({ message: 'Senhas diferentes! Verifique e tente novamente.'})
         }
 
         // gerar hash da nova senha

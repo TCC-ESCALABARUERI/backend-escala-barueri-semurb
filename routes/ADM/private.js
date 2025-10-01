@@ -152,7 +152,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
 
         const { matricula_adm, matricula_funcionario, nome, email, telefone, cargo, nome_regiao, nome_equipe } = req.body
         
-        let senha = toString(matricula_funcionario)
+        let senha = String(matricula_funcionario)
         // Criptografar senha
         const salt = await bcrypt.genSalt(10)
         const senhaHash = await bcrypt.hash(senha, salt)
@@ -487,91 +487,83 @@ route.put('/alterarEscala', async (req, res) => {
     }
 })
 
-//cadastrar turno e vincular ao funcionário
+// cadastrar turno e vincular ao funcionário
 route.post('/cadastrarTurno', async (req, res) => {
-    try {
-        const obrigatorios = [
-            'matricula_adm',
-            'matricula_funcionario',
-            'inicio_turno',
-            'termino_turno',
-            'duracao_turno',
-            'intervalo_turno'
-        ]
-        const campoFaltando = validarCampos(obrigatorios, req.body)
-        if (campoFaltando) {
-            return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
-        }
-
-        const { matricula_adm, matricula_funcionario, inicio_turno, termino_turno, duracao_turno, intervalo_turno } = req.body
-
-        // Verificar se funcionário existe
-        const { data: funcionarioExistente, error: errorFuncionario } = await supabase
-            .from('funcionario')
-            .select('*')
-            .eq('matricula_funcionario', matricula_funcionario)
-            .maybeSingle()
-
-        if (errorFuncionario) {
-            return res.status(400).json({ mensagem: 'Erro ao buscar funcionário', erro: errorFuncionario })
-        }
-        if (!funcionarioExistente) {
-            return res.status(400).json({ mensagem: 'Matrícula do funcionário não encontrada' })
-        }
-
-        // garantir que o funcionario possua escala antes de buscar turnos
-        if (!funcionarioExistente.id_escala) {
-            return res.status(400).json({
-                mensagem: 'Funcionário não possui escala vinculada. Cadastre uma escala antes de adicionar um turno.'
-            })
-        }
-
-        // verificar se o funcionario ja possui um turno vinculado
-        const { data: turnoExistente, error } = await supabase
-            .from('escala_turno')
-            .select('*')
-            .eq('id_escala', funcionarioExistente.id_escala)
-            .maybeSingle()
-
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao buscar turno do funcionário', erro: error })
-        }
-
-        if (turnoExistente) {
-            return res.status(400).json({ mensagem: 'Funcionário já possui um turno vinculado' })
-        }
-
-        // Inserir turno
-        const { data: turnoCriado, error: errorTurno } = await supabase
-            .from('turno')
-            .insert([{ inicio_turno, termino_turno, duracao_turno, intervalo_turno }])
-            .select()
-            .single()
-
-        if (errorTurno) {
-            return res.status(400).json({ mensagem: 'Erro ao inserir turno', erro: errorTurno })
-        }
-
-        // Vincular turno ao funcionário
-        const { data: turnoVinculado, error: errorVinculo } = await supabase
-            .from('escala_turno')
-            .insert([{ id_escala: funcionarioExistente.id_escala, id_turno: turnoCriado.id_turno }])
-            .select()
-            .single()
-
-        if (errorVinculo) {
-            return res.status(400).json({ mensagem: 'Erro ao vincular turno ao funcionário', erro: errorVinculo })
-        }
-
-        res.status(201).json({
-            mensagem: 'Turno cadastrado e vinculado com sucesso',
-            turno: turnoCriado,
-            funcionario: funcionarioExistente
-        })
-
-    } catch (error) {
-        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  try {
+    const obrigatorios = [
+      'matricula_adm',
+      'matricula_funcionario',
+      'inicio_turno',
+      'termino_turno',
+      'duracao_turno',
+      'intervalo_turno'
+    ]
+    const campoFaltando = validarCampos(obrigatorios, req.body)
+    if (campoFaltando) {
+      return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
     }
+
+    const { matricula_adm, matricula_funcionario, inicio_turno, termino_turno, duracao_turno, intervalo_turno } = req.body
+
+    // Verificar se funcionário existe
+    const { data: funcionarioExistente, error: errorFuncionario } = await supabase
+      .from('funcionario')
+      .select('*')
+      .eq('matricula_funcionario', matricula_funcionario)
+      .maybeSingle()
+
+    if (errorFuncionario) {
+      return res.status(400).json({ mensagem: 'Erro ao buscar funcionário', erro: errorFuncionario })
+    }
+    if (!funcionarioExistente) {
+      return res.status(400).json({ mensagem: 'Matrícula do funcionário não encontrada' })
+    }
+
+    // garantir que o funcionario possua escala antes de buscar turnos
+    if (!funcionarioExistente.id_escala) {
+      return res.status(400).json({
+        mensagem: 'Funcionário não possui escala vinculada. Cadastre uma escala antes de adicionar um turno.'
+      })
+    }
+
+    // verificar se o funcionario já possui um turno vinculado
+    if (funcionarioExistente.id_turno) {
+      return res.status(400).json({ mensagem: 'Funcionário já possui um turno vinculado' })
+    }
+
+    // Inserir turno
+    const { data: turnoCriado, error: errorTurno } = await supabase
+      .from('turno')
+      .insert([{ inicio_turno, termino_turno, duracao_turno, intervalo_turno }])
+      .select("*")
+      .single()
+
+    if (errorTurno) {
+      return res.status(400).json({ mensagem: 'Erro ao inserir turno', erro: errorTurno })
+    }
+
+    // Vincular turno criado ao funcionário
+    const { data: turnoVinculado, error: errorVinculo } = await supabase
+      .from('funcionario')
+      .update({ id_turno: turnoCriado.id_turno })
+      .eq('matricula_funcionario', matricula_funcionario)
+      .select('*')
+      .single()
+
+    if (errorVinculo) {
+      return res.status(400).json({ mensagem: "Erro ao vincular turno ao funcionário!", erro: errorVinculo })
+    }
+
+    res.status(201).json({
+      mensagem: 'Turno cadastrado e vinculado com sucesso',
+      turno: turnoCriado,
+      funcionario: turnoVinculado
+    })
+
+  } catch (error) {
+    return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  }
 })
+
 
 export default route
