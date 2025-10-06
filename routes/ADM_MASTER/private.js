@@ -222,6 +222,16 @@ route.delete('/deletarFuncionario_master/:matricula_funcionario', async (req, re
       return res.status(400).json({ mensagem: 'Erro ao deletar notificações', erro: notifError });
     }
 
+    // depois apaga confirmacoes
+    const { error: confirmError } = await supabase
+      .from('escala_confirmacao')
+      .delete()
+      .eq('matricula_funcionario', matricula_funcionario);
+
+    if (confirmError) {
+      return res.status(400).json({ mensagem: 'Erro ao deletar conformações', erro: confirmError });
+    }
+
     //depois apaga o funcionario
     const { error: funcError } = await supabase
       .from('funcionario')
