@@ -12,49 +12,139 @@ function validarCampos(campos, body) {
     return null
 }
 
-// mostrar todas as escalas cadastradas
-route.get('/escalas', async (req, res) => {
+// listar equipes do setor (apenas equipes com funcionários no setor)
+route.get('/equipesSetor/:matricula_adm', async (req, res) => {
+    const { matricula_adm } = req.params
+    if (!matricula_adm) {
+        return res.status(400).json({ mensagem: 'Matrícula do ADM é obrigatória' })
+    }
     try {
-        const { data, error } = await supabase
-            .from('escala')
-            .select('*')
+        // buscar setor do adm
+        const { data: adm } = await supabase
+            .from('funcionario')
+            .select('id_setor')
+            .eq('matricula_funcionario', matricula_adm)
+            .maybeSingle()
+        
+        if (!adm) {
+            return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
+        }
 
+        // buscar equipes que possuem funcionários no setor
+        const { data: equipes, error } = await supabase
+            .from('funcionario')
+            .select('id_equipe, equipe:equipe(nome_equipe)')
+            .eq('id_setor', adm.id_setor)
+            .not('id_equipe', 'is', null)
+
+        if (error) {    
+            return res.status(400).json({ mensagem: 'Erro ao buscar equipes', erro: error })
+        }
+
+        // Remover duplicatas e formatar resultado
+        const equipesUnicas = []
+        const nomesVistos = new Set()
+        for (const f of equipes) {
+            if (f.equipe && f.equipe.nome_equipe && !nomesVistos.has(f.equipe.nome_equipe)) {
+                equipesUnicas.push({
+                    id_equipe: f.id_equipe,
+                    nome_equipe: f.equipe.nome_equipe
+                })
+                nomesVistos.add(f.equipe.nome_equipe)
+            }
+        }
+
+        res.status(200).json(equipesUnicas)
+
+    } catch (error) {
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+})
+
+// listar regiões do setor
+route.get('/regiaoSetor/:matricula_adm', async (req, res) => {
+    const { matricula_adm } = req.params
+
+    if (!matricula_adm) {
+        return res.status(400).json({ mensagem: 'Matrícula do ADM é obrigatória' })
+    }
+
+    try {
+        //buscar setor do adm
+        const { data: setorData } = await supabase
+            .from('funcionario')
+            .select('id_setor')
+            .eq('matricula_funcionario', matricula_adm)
+            .maybeSingle()
+
+        if (!setorData) {
+            return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
+        }
+
+        // buscar regiões que possuem funcionários no setor
+        const { data: regioes, error } = await supabase
+            .from('funcionario')
+            .select('id_regiao, regiao:regiao(nome_regiao)')
+            .eq('id_setor', setorData.id_setor)
+            .not('id_regiao', 'is', null)
 
         if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar regiões', erro: error })
+        }
+
+        // Remover duplicatas e formatar resultado
+        const regioesUnicas = []
+        const nomesVistos = new Set()
+        for (const f of regioes) {
+            if (f.regiao && f.regiao.nome_regiao && !nomesVistos.has(f.regiao.nome_regiao)) {
+                regioesUnicas.push({
+                    id_regiao: f.id_regiao,
+                    nome_regiao: f.regiao.nome_regiao
+                })
+
+                nomesVistos.add(f.regiao.nome_regiao)
+            }
+        }
+        res.status(200).json(regioesUnicas)
+    } catch (error) {
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+})
+
+//listar escalas do setor
+route.get('/escalasSetor/:matricula_adm', async (req, res) => {
+    try {
+        const { matricula_adm } = req.params
+
+        if (!matricula_adm) {
+            return res.status(400).json({ mensagem: 'Matrícula do ADM é obrigatória' })
+        }
+
+        // buscar setor do adm
+        const { data: adm } = await supabase
+            .from('funcionario')
+            .select('id_setor')
+            .eq('matricula_funcionario', matricula_adm)
+            .maybeSingle()
+
+        if (!adm) {
+            return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
+        }
+
+        // buscar escalas do setor
+        const { data: escalas, error } = await supabase
+            .from('funcionario')
+            .select(`matricula_funcionario, nome,
+            escala(id_escala, data_inicio, dias_trabalhados, dias_n_trabalhados, tipo_escala, dias_n_trabalhados_escala_semanal)`)
+            .eq('id_setor', adm.id_setor)
+            .not('id_escala', 'is', null) // filtrar apenas funcionarios com escala vinculada
+            .order('nome', { ascending: true }) // ordenar por nome do funcionário
+
+        if (error) {    
             return res.status(400).json({ mensagem: 'Erro ao buscar escalas', erro: error })
         }
-        res.status(200).json(data)
-    } catch (error) {
-        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
-    }
 
-})
-
-route.get('/equipes', async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('equipe')
-            .select('id_equipe, nome_equipe')
-
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao buscar equipes', erro: error })
-        }
-        res.status(200).json(data)
-    } catch (error) {
-        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
-    }
-})
-
-route.get('/regiao', async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('regiao')
-            .select('id_regiao, nome_regiao')
-
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao buscar equipes', erro: error })
-        }
-        res.status(200).json(data)
+        res.status(200).json(escalas)
     } catch (error) {
         return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
     }
@@ -101,38 +191,40 @@ route.get(`/funcionariosSetor/:matricula_adm`, async (req, res) => {
 })
 
 // retornar confimação de leitura da escala de todos os funcionarios do setor
-route.get('/confirmacoesLeituraEscala/:matricula_adm', async (req, res) => {
+route.get('/confirmacoesSetor/:matricula_adm', async (req, res) => {
     try {
         const { matricula_adm } = req.params
+        if (!matricula_adm) return res.status(400).json({ mensagem: 'Matrícula do ADM é obrigatória' })
 
-        if (!matricula_adm) {
-            return res.status(400).json({ mensagem: 'Matrícula do ADM é obrigatória' })
-        }
-
-        // buscar setor do adm
-        const { data: adm } = await supabase
+        // Buscar setor do ADM
+        const { data: adm, error: errorAdm } = await supabase
             .from('funcionario')
             .select('id_setor')
             .eq('matricula_funcionario', matricula_adm)
             .maybeSingle()
 
-        if (!adm) {
-            return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
-        }
+        if (errorAdm) return res.status(400).json({ mensagem: 'Erro ao buscar ADM', erro: errorAdm })
+        if (!adm) return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
 
-        // buscar funcionarios do setor com escala
+        // Buscar confirmações de leitura da escala dos funcionários do setor
         const { data: confirmacoes, error } = await supabase
             .from('funcionario')
-            .select(`matricula_funcionario, nome,
-            escala_confirmacao(id_escala, status, data_confirmacao, 
-            escala(id_escala, data_inicio, dias_trabalhados, dias_n_trabalhados, tipo_escala))`)
+            .select(`
+                matricula_funcionario,
+                nome,
+                escala_confirmacao:escala_confirmacao!escala_confirmacao_matricula_funcionario_fkey(
+                    id_confirmacao,
+                    id_escala,
+                    data_confirmacao,
+                    status
+                ),
+                escala(id_escala, data_inicio, tipo_escala)
+            `)
             .eq('id_setor', adm.id_setor)
-            .not('id_escala', 'is', null) // filtrar apenas funcionarios com escala vinculada
+            .not('id_escala', 'is', null)
             .order('nome', { ascending: true })
 
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao buscar confirmações de leitura', erro: error })
-        }
+        if (error) return res.status(400).json({ mensagem: 'Erro ao buscar confirmações', erro: error })
 
         res.status(200).json(confirmacoes)
 
@@ -140,6 +232,84 @@ route.get('/confirmacoesLeituraEscala/:matricula_adm', async (req, res) => {
         return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
     }
 })
+
+
+// Mostrar funcionários que estão atuando em determinada data
+route.get('/funcionariosAtivos', async (req, res) => {
+    try {
+        const { data } = req.query
+        if (!data) {
+            return res.status(400).json({ mensagem: 'Data é obrigatória no formato DD/MM/YYYY ou YYYY-MM-DD' })
+        }
+
+        // Buscar todos funcionários com escala vinculada
+        const { data: funcionarios, error } = await supabase
+            .from('funcionario')
+            .select(`
+                matricula_funcionario, nome, id_escala,
+                escala(id_escala, data_inicio, dias_trabalhados, dias_n_trabalhados, tipo_escala, dias_n_trabalhados_escala_semanal)
+            `)
+            .not('id_escala', 'is', null)
+
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar funcionários', erro: error })
+        }
+
+        // Função local para verificar se o funcionário está ativo na data
+        function estaAtivoNaData(func, dataConsulta) {
+            const escala = func.escala
+            if (!escala || !escala.data_inicio) return false
+
+            const inicio = new Date(escala.data_inicio)
+            const consulta = new Date(dataConsulta)
+            if (isNaN(consulta.getTime())) return false
+            if (consulta < inicio) return false
+
+            const diffDias = Math.floor((consulta - inicio) / (1000 * 60 * 60 * 24))
+            const ciclo = escala.dias_trabalhados + escala.dias_n_trabalhados
+            if (ciclo === 0) return false
+
+            // Verificação de folgas semanais
+            if (escala.dias_n_trabalhados_escala_semanal) {
+                let diasFolga = escala.dias_n_trabalhados_escala_semanal
+
+                // Caso venha em formato de string JSON, converter
+                if (typeof diasFolga === 'string') {
+                    try {
+                        diasFolga = JSON.parse(diasFolga)
+                    } catch {
+                        diasFolga = []
+                    }
+                }
+
+                if (Array.isArray(diasFolga) && diasFolga.length > 0) {
+                    const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
+                    const diaSemana = diasSemana[consulta.getDay()]
+
+                    // Normalizar maiúsculas/minúsculas
+                    const diaNormalizado = diaSemana.toLowerCase().trim()
+                    const folgasNormalizadas = diasFolga.map(d => d.toLowerCase().trim())
+
+                    if (folgasNormalizadas.includes(diaNormalizado)) {
+                        return false // está de folga neste dia
+                    }
+                }
+            }
+
+            const posicaoNoCiclo = diffDias % ciclo
+            return posicaoNoCiclo < escala.dias_trabalhados
+        }
+
+        // Filtrar os funcionários ativos na data
+        const ativos = funcionarios.filter(func => estaAtivoNaData(func, data))
+
+        res.status(200).json(ativos)
+    } catch (error) {
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+})
+
+
 
 // Cadastrar funcionário no setor do adm
 route.post('/cadastrarFuncionario', async (req, res) => {
@@ -157,7 +327,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
         const salt = await bcrypt.genSalt(10)
         const senhaHash = await bcrypt.hash(senha, salt)
 
-        let equipeId;
+        let equipeId
         //encontrar equipe pelo nome
         const { data: equipeExistente } = await supabase
             .from('equipe')
@@ -165,31 +335,17 @@ route.post('/cadastrarFuncionario', async (req, res) => {
             .eq('nome_equipe', nome_equipe)
             .maybeSingle()
 
-        if (equipeExistente) {
-            //se equipe existe usa o id dela
-            equipeId = equipeExistente.id_equipe
-        } else {
-            // se equipe n existe cria outra
-            const { data: novaEquipe, error: errorNovaEquipe } = await supabase
-                .from('equipe')
-                .insert([{ nome_equipe: nome_equipe }])
-                .select('id_equipe')
-                .single();
-
-            if (errorNovaEquipe) {
-                return res.status(400).json({ mensagem: 'Erro ao criar nova equipe', erro: errorNovaEquipe })
-            }
-
-            equipeId = novaEquipe.id_equipe
+        if(!equipeExistente) {
+            return res.status(400).json({ mensagem: 'Equipe não encontrada. Cadastre a equipe antes de vincular ao funcionário.' })
         }
 
-        let regiaoId;
+        let regiaoId
         // encontrar regiao pelo nome
         const { data: regiaoExistente } = await supabase
             .from('regiao')
             .select('id_regiao')
             .eq('nome_regiao', nome_regiao)
-            .maybeSingle();
+            .maybeSingle()
 
         if (regiaoExistente) {
             // see regiao existe usa o id
@@ -201,6 +357,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
                 .insert([{ nome_regiao: nome_regiao }])
                 .select('id_regiao')
                 .single()
+
 
             if (errorNovaRegiao) {
                 return res.status(400).json({ mensagem: 'Erro ao criar nova regiao', erro: errorNovaRegiao })
@@ -272,28 +429,106 @@ route.post('/cadastrarFuncionario', async (req, res) => {
     }
 })
 
-// editar informacoes do funcionario
 
+// editar informacoes do funcionario do setor do adm
 
 // Cadastrar escala e vincular ao funcionário
 route.post('/cadastrarEscala', async (req, res) => {
+    const obrigatorios = [
+        'matricula_adm',
+        'matricula_funcionario',
+        'data_inicio',
+        'tipo_escala'
+    ]
+
+    const campoFaltando = validarCampos(obrigatorios, req.body)
+    if (campoFaltando) {
+        return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
+    }
+
     try {
-        const obrigatorios = [
-            'matricula_adm',
-            'matricula_funcionario',
-            'data_inicio',
-            'dias_trabalhados',
-            'dias_n_trabalhados',
-            'tipo_escala'
-        ]
-        const campoFaltando = validarCampos(obrigatorios, req.body)
-        if (campoFaltando) {
-            return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
+        const {
+            matricula_adm,
+            matricula_funcionario,
+            data_inicio,
+            tipo_escala,
+            dias_n_trabalhados_escala_semanal,
+            usa_dias_especificos
+        } = req.body
+
+        // Interpreta a escala no formato "NxM"
+        const interpretarEscala = (tipo) => {
+            const padrao = /^(\d{1,2})x(\d{1,2})$/
+            const match = tipo.match(padrao)
+            if (!match) return null
+
+            let n = parseInt(match[1], 10)
+            let m = parseInt(match[2], 10)
+
+            // Se a soma exceder 7, assume que são horas e converte para dias
+            if ((n + m) > 7) {
+                n = Math.ceil(n / 24)
+                m = Math.ceil(m / 24)
+            }
+
+            return { dias_trabalhados: n, dias_n_trabalhados: m }
         }
 
-        const { matricula_adm, matricula_funcionario, data_inicio, dias_trabalhados, dias_n_trabalhados, tipo_escala } = req.body
+        const escalaInfo = interpretarEscala(tipo_escala)
+        if (!escalaInfo) {
+            return res.status(400).json({ mensagem: 'Tipo de escala inválido. Use o formato "6x1", "12x36", etc.' })
+        }
 
-        // Verificar se funcionário existe
+        const { dias_trabalhados, dias_n_trabalhados } = escalaInfo
+        const precisa_dias_especificos = usa_dias_especificos === true
+
+        // Se a escala exige dias específicos, validar o campo enviado
+        if (precisa_dias_especificos) {
+            if ( 
+                !dias_n_trabalhados_escala_semanal ||
+                !Array.isArray(dias_n_trabalhados_escala_semanal) ||
+                dias_n_trabalhados_escala_semanal.length === 0
+            ) {
+                return res.status(400).json({
+                    mensagem: 'Escala exige dias de folga específicos. Informe "dias_n_trabalhados_escala_semanal" como array.'
+                })
+            }
+
+            const diasValidos = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
+            const diasInvalidos = dias_n_trabalhados_escala_semanal.filter(d => !diasValidos.includes(d))
+
+            if (diasInvalidos.length > 0) {
+                return res.status(400).json({
+                    mensagem: `Os seguintes dias são inválidos: ${diasInvalidos.join(', ')}`,
+                    dias_validos: diasValidos
+                })
+            }
+        }
+
+        // verificar se os dias especificos se igualam a quantidade de dias não trabalhados
+        // mapear a quantidade de dias em dias_n_trabalhados_semanal
+        if (precisa_dias_especificos) {
+            const diasMapeados = {
+                'Dom': 0,
+                'Seg': 1,
+                'Ter': 2,
+                'Qua': 3,
+                'Qui': 4,                   
+                'Sex': 5,
+                'Sab': 6
+            }
+            const diasUnicos = [...new Set(dias_n_trabalhados_escala_semanal)]
+            const quantidadeDias = diasUnicos.length
+
+            if (quantidadeDias !== dias_n_trabalhados) {
+                return res.status(400).json({
+                    mensagem: `A quantidade de dias não trabalhados (${dias_n_trabalhados}) não corresponde à quantidade de dias específicos fornecidos (${quantidadeDias}).`,
+                    detalhes: 'Verifique os dias específicos e ajuste conforme necessário.'
+                })
+            }
+        }
+
+        // Verificar se o funcionário existe
         const { data: funcionarioExistente, error: errorFuncionario } = await supabase
             .from('funcionario')
             .select('*')
@@ -307,7 +542,7 @@ route.post('/cadastrarEscala', async (req, res) => {
             return res.status(400).json({ mensagem: 'Matrícula do funcionário não encontrada' })
         }
 
-        // verificar setor do adm para garantir que o funcionario pertence ao setor
+        // Verificar setor do ADM
         const { data: adm } = await supabase
             .from('funcionario')
             .select('id_setor')
@@ -322,7 +557,7 @@ route.post('/cadastrarEscala', async (req, res) => {
             return res.status(400).json({ mensagem: 'Funcionário não pertence ao setor do ADM' })
         }
 
-        // verificar se o funcionario ja possui uma escala vinculada
+        // Verificar se já possui escala
         const { data: escalaExistente } = await supabase
             .from('funcionario')
             .select('*')
@@ -336,7 +571,13 @@ route.post('/cadastrarEscala', async (req, res) => {
         // Inserir escala
         const { data: escalaCriada, error: errorEscala } = await supabase
             .from('escala')
-            .insert([{ data_inicio, dias_trabalhados, dias_n_trabalhados, tipo_escala }])
+            .insert([{
+                data_inicio,
+                tipo_escala,
+                dias_trabalhados,
+                dias_n_trabalhados,
+                dias_n_trabalhados_escala_semanal: precisa_dias_especificos ? dias_n_trabalhados_escala_semanal : null
+            }])
             .select()
             .single()
 
@@ -355,58 +596,120 @@ route.post('/cadastrarEscala', async (req, res) => {
             return res.status(400).json({ mensagem: 'Erro ao vincular escala ao funcionário', erro: errorUpdate })
         }
 
-        // gerar confirmação de leitura da escala
+        // Criar confirmação de leitura da escala
         const { data: primeiraConfirmacao } = await supabase
             .from('escala_confirmacao')
-            .insert([{ 
-                matricula_funcionario: funcionarioExistente.matricula_funcionario, 
-                id_escala: escalaCriada.id_escala }])
+            .insert([{
+                matricula_funcionario: funcionarioExistente.matricula_funcionario,
+                id_escala: escalaCriada.id_escala
+            }])
             .select('*')
             .single()
 
-            if (!primeiraConfirmacao) {
-                return res.status(400).json({ mensagem: 'Erro ao criar confirmação de leitura da escala' })
-            }
-
-        // vincular id confirmacao da escala em questão ao funcionario
-        const { data: confirmacaoVinculada } = await supabase
-            .from('funcionario')
-            .update({ id_confirmacao: primeiraConfirmacao.id_confirmacao })
-            .eq('matricula_funcionario', funcionarioExistente.matricula_funcionario)
-            .select()
-
-        if (!confirmacaoVinculada) {
-            return res.status(400).json({ mensagem: 'Erro ao vincular confirmação de leitura ao funcionário' })
+        if (!primeiraConfirmacao) {
+            return res.status(400).json({ mensagem: 'Erro ao criar confirmação de leitura da escala' })
         }
-
-        res.status(201).json({
-            mensagem: 'Escala cadastrada e vinculada com sucesso',
-            escala: escalaCriada,
-            funcionario: funcionarioAtualizado
-        })
-
     } catch (error) {
         return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
     }
+
+    return res.status(201).json({ mensagem: 'Escala cadastrada e vinculada com sucesso' })
 })
 
 // rota para alterar uma escala existente
 route.put('/alterarEscala', async (req, res) => {
+    const obrigatorios = [
+        'matricula_adm',
+        'matricula_funcionario',
+        'data_inicio',
+        'tipo_escala'
+    ]
+    const campoFaltando = validarCampos(obrigatorios, req.body)
+    if (campoFaltando) {
+        return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
+    }
+
     try {
-        const obrigatorios = [
-            'matricula_adm',
-            'matricula_funcionario',
-            'data_inicio',
-            'dias_trabalhados',
-            'dias_n_trabalhados',
-            'tipo_escala'
-        ]
-        const campoFaltando = validarCampos(obrigatorios, req.body)
-        if (campoFaltando) {
-            return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
+        const {
+            matricula_adm,
+            matricula_funcionario,
+            data_inicio,
+            tipo_escala,
+            dias_n_trabalhados_escala_semanal,
+            usa_dias_especificos
+        } = req.body
+
+        // Interpreta a escala no formato "NxM"
+        const interpretarEscala = (tipo) => {
+            const padrao = /^(\d{1,2})x(\d{1,2})$/
+            const match = tipo.match(padrao)
+            if (!match) return null
+
+            let n = parseInt(match[1], 10)
+            let m = parseInt(match[2], 10)
+
+            // Se a soma exceder 7, assume que são horas e converte para dias
+            if ((n + m) > 7) {
+                n = Math.ceil(n / 24)
+                m = Math.ceil(m / 24)
+            }
+
+            return { dias_trabalhados: n, dias_n_trabalhados: m }
         }
 
-        const { matricula_adm, matricula_funcionario, data_inicio, dias_trabalhados, dias_n_trabalhados, tipo_escala } = req.body
+        const escalaInfo = interpretarEscala(tipo_escala)
+        if (!escalaInfo) {
+            return res.status(400).json({ mensagem: 'Tipo de escala inválido. Use o formato "6x1", "12x36", etc.' })
+        }
+
+        const { dias_trabalhados, dias_n_trabalhados } = escalaInfo
+        const precisa_dias_especificos = usa_dias_especificos === true
+
+        // Se a escala exige dias específicos, validar o campo enviado
+        if (precisa_dias_especificos) {
+            if ( 
+                !dias_n_trabalhados_escala_semanal ||
+                !Array.isArray(dias_n_trabalhados_escala_semanal) ||
+                dias_n_trabalhados_escala_semanal.length === 0
+            ) {
+                return res.status(400).json({
+                    mensagem: 'Escala exige dias de folga específicos. Informe "dias_n_trabalhados_escala_semanal" como array.'
+                })
+            }
+
+            const diasValidos = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
+            const diasInvalidos = dias_n_trabalhados_escala_semanal.filter(d => !diasValidos.includes(d))
+
+            if (diasInvalidos.length > 0) {
+                return res.status(400).json({
+                    mensagem: `Os seguintes dias são inválidos: ${diasInvalidos.join(', ')}`,
+                    dias_validos: diasValidos
+                })
+            }
+        }
+
+        // verificar se os dias especificos se igualam a quantidade de dias não trabalhados
+        // mapear a quantidade de dias em dias_n_trabalhados_semanal
+        if (precisa_dias_especificos) {
+            const diasMapeados = {
+                'Dom': 0,
+                'Seg': 1,
+                'Ter': 2,
+                'Qua': 3,
+                'Qui': 4,                   
+                'Sex': 5,
+                'Sab': 6
+            }
+            const diasUnicos = [...new Set(dias_n_trabalhados_escala_semanal)]
+            const quantidadeDias = diasUnicos.length
+
+            if (quantidadeDias !== dias_n_trabalhados) {
+                return res.status(400).json({
+                    mensagem: `A quantidade de dias não trabalhados (${dias_n_trabalhados}) não corresponde à quantidade de dias específicos fornecidos (${quantidadeDias}).`,
+                    detalhes: 'Verifique os dias específicos e ajuste conforme necessário.'
+                })
+            }
+        }
 
         // Verificar se funcionário existe
         const { data: funcionarioExistente, error: errorFuncionario } = await supabase
@@ -447,7 +750,13 @@ route.put('/alterarEscala', async (req, res) => {
         // Alterar escala
         const { data: escalaAtualizada, error: errorEscala } = await supabase
             .from('escala')
-            .update({ data_inicio, dias_trabalhados, dias_n_trabalhados, tipo_escala })
+            .update({
+                data_inicio,
+                tipo_escala,
+                dias_trabalhados,
+                dias_n_trabalhados,
+                dias_n_trabalhados_escala_semanal: precisa_dias_especificos ? dias_n_trabalhados_escala_semanal : null
+            })
             .eq('id_escala', funcionarioExistente.id_escala)
             .select()
             .single()
@@ -457,12 +766,13 @@ route.put('/alterarEscala', async (req, res) => {
         }
 
         // gerar nova confirmação de leitura da escala
-        const {data: escalaConfirmacao} = await supabase
+        const { data: escalaConfirmacao } = await supabase
             .from('escala_confirmacao')
-            .insert({ 
-                matricula_funcionario: funcionarioExistente.matricula_funcionario, 
-                id_escala: escalaAtualizada.id_escala, 
-                data_confirmacao: null })
+            .insert({
+                matricula_funcionario: funcionarioExistente.matricula_funcionario,
+                id_escala: escalaAtualizada.id_escala,
+                data_confirmacao: null
+            })
             .select('*')
             .single()
 
