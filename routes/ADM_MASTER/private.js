@@ -209,23 +209,46 @@ route.put('/editarPermissao/:matricula_funcionario', async (req, res) => {
 
 // Deletar Funcionário
 route.delete('/deletarFuncionario_master/:matricula_funcionario', async (req, res) => {
-    try {
-        const { matricula_funcionario } = req.params
+  try {
+    const { matricula_funcionario } = req.params;
 
-        const { error } = await supabase
-            .from('funcionario')
-            .delete()
-            .eq('matricula_funcionario', matricula_funcionario)
+    // apaga as notificacoes do funcoinario primeiro
+    const { error: notifError } = await supabase
+      .from('notificacoes')
+      .delete()
+      .eq('matricula_funcionario', matricula_funcionario);
 
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao deletar funcionário', erro: error })
-        }
-
-        res.status(200).json({ mensagem: 'Funcionário deletado com sucesso' })
-    } catch (error) {
-        res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    if (notifError) {
+      return res.status(400).json({ mensagem: 'Erro ao deletar notificações', erro: notifError });
     }
-})
+
+    // depois apaga confirmacoes
+    const { error: confirmError } = await supabase
+      .from('escala_confirmacao')
+      .delete()
+      .eq('matricula_funcionario', matricula_funcionario);
+
+    if (confirmError) {
+      return res.status(400).json({ mensagem: 'Erro ao deletar conformações', erro: confirmError });
+    }
+
+    //depois apaga o funcionario
+    const { error: funcError } = await supabase
+      .from('funcionario')
+      .delete()
+      .eq('matricula_funcionario', matricula_funcionario);
+
+    if (funcError) {
+      return res.status(400).json({ mensagem: 'Erro ao deletar funcionário', erro: funcError });
+    }
+
+    res.status(200).json({ mensagem: 'Funcionário deletado com sucesso' });
+
+  } catch (error) {
+    res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message });
+  }
+});
+
 
 //Setores
 
