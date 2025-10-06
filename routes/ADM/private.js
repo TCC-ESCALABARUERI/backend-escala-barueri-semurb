@@ -150,6 +150,61 @@ route.get('/escalasSetor/:matricula_adm', async (req, res) => {
     }
 })
 
+// listar turnos do setor (retorna todas as informações do turno)
+route.get('/turnosSetor/:matricula_adm', async (req, res) => {
+    try {
+        const { matricula_adm } = req.params
+        if (!matricula_adm) {
+            return res.status(400).json({ mensagem: 'Matrícula do ADM é obrigatória' })
+        }
+
+        // buscar setor do adm
+        const { data: adm } = await supabase
+            .from('funcionario')
+            .select('id_setor')
+            .eq('matricula_funcionario', matricula_adm)
+            .maybeSingle()
+
+        if (!adm) {
+            return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
+        }
+
+        // buscar todos id_turno dos funcionários do setor
+        const { data: funcionarios, error: errorFuncionarios } = await supabase
+            .from('funcionario')
+            .select('id_turno')
+            .eq('id_setor', adm.id_setor)
+            .not('id_turno', 'is', null)
+
+        if (errorFuncionarios) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar funcionários do setor', erro: errorFuncionarios })
+        }
+
+        // Extrair ids únicos de turno
+        const turnosIds = [...new Set(funcionarios.map(f => f.id_turno))]
+
+        if (turnosIds.length === 0) {
+            return res.status(200).json([]) // Nenhum turno vinculado
+        }
+
+        // Buscar todos os turnos completos pelo id_turno
+        const { data: turnos, error: errorTurnos } = await supabase
+            .from('turno')
+            .select('*')
+            .in('id_turno', turnosIds)
+            .order('id_turno', { ascending: true })
+
+        if (errorTurnos) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar turnos', erro: errorTurnos })
+        }
+
+        res.status(200).json(turnos)
+    } catch (error) {
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+})
+
+
 //listar funcionarios do setor do adm
 route.get(`/funcionariosSetor/:matricula_adm`, async (req, res) => {
     try {

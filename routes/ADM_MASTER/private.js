@@ -84,45 +84,13 @@ route.get('/listarFuncionarios_master', async (req, res) => {
     }
 })
 
-// Listar Funcionário por Setor
-route.get('/listarFuncionariosSetor_master/:setor', async (req, res) => {
-    try {
-        const { setor } = req.params
-
-        // buscar setor pelo nome
-        const { data: setorData, error: setorError } = await supabase
-            .from('setor')
-            .select('id_setor')
-            .eq('nome_setor', setor)
-            .maybeSingle()
-
-        if (setorError || !setorData) {
-            return res.status(400).json({ mensagem: 'Setor não encontrado', erro: setorError })
-        }
-
-        // buscar funcionários do setor
-        const { data, error } = await supabase
-            .from('funcionario')
-            .select()
-            .eq('id_setor', setorData.id_setor)
-
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao listar funcionários', erro: error })
-        }
-
-        res.status(200).json({ funcionarios: data })
-    } catch (error) {
-        res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
-    }
-})
-
-// editar funcionário por matrícula
-route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) => {
+// Editar funcionário (dados e permissão, sem senha)
+route.put('/editarFuncionario/:matricula_funcionario', async (req, res) => {
     try {
         const { matricula_funcionario } = req.params
-        const { nome, email, senha, telefone, cargo, setor } = req.body
+        const { email, telefone, cargo, setor, status_permissao } = req.body
 
-        // dados antigos do funcionario
+        // Buscar dados antigos do funcionário
         const { data: funcionarioDesatualizado } = await supabase
             .from('funcionario')
             .select('*')
@@ -133,16 +101,8 @@ route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) =
             return res.status(404).json({ mensagem: 'Funcionário não encontrado' })
         }
 
-        let senhaHash = funcionarioDesatualizado.senha
-
-        // se a senha foi alterada, criptografar a nova senha
-        if (senha && senha !== funcionarioDesatualizado.senha) {
-            const salt = await bcrypt.genSalt(10)
-            senhaHash = await bcrypt.hash(senha, salt)
-        }
-
-        // buscar setor para associar ao funcionário
-        let setor_id = funcionarioDesatualizado.setor_id
+        // Buscar setor para associar ao funcionário
+        let setor_id = funcionarioDesatualizado.id_setor
         if (setor) {
             const { data: setorData, error: setorError } = await supabase
                 .from('setor')
@@ -156,16 +116,15 @@ route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) =
             setor_id = setorData.id_setor
         }
 
-        // atualizar funcionário
+        // Atualizar funcionário
         const { data: funcionarioAtualizado, error } = await supabase
             .from('funcionario')
             .update({
-                nome: nome || funcionarioDesatualizado.nome,
                 email: email || funcionarioDesatualizado.email,
-                senha: senhaHash,
                 telefone: telefone || funcionarioDesatualizado.telefone,
                 cargo: cargo || funcionarioDesatualizado.cargo,
                 id_setor: setor_id,
+                status_permissao: status_permissao !== undefined ? status_permissao : funcionarioDesatualizado.status_permissao
             })
             .eq('matricula_funcionario', matricula_funcionario)
             .select('*')
@@ -177,32 +136,6 @@ route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) =
         res.status(200).json({ mensagem: 'Funcionário atualizado com sucesso', funcionario: funcionarioAtualizado[0] }) 
     }
     catch (error) {
-        res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
-    }
-})
-
-// Editar Permissão
-route.put('/editarPermissao/:matricula_funcionario', async (req, res) => {
-    try {
-        const { matricula_funcionario } = req.params
-        const { status_permissao } = req.body // "Sim" ou "Não"
-
-        if (!status_permissao) {
-            return res.status(400).json({ mensagem: 'Informe a permissão (Sim ou Não)' })
-        }
-
-        const { data, error } = await supabase
-            .from('funcionario')
-            .update({ status_permissao: stat })
-            .eq('matricula_funcionario', matricula_funcionario)
-            .select('*')
-
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao atualizar permissão', erro: error })
-        }
-
-        res.status(200).json({ mensagem: 'Permissão atualizada com sucesso', funcionario: data[0] })
-    } catch (error) {
         res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
     }
 })
@@ -287,7 +220,6 @@ route.post('/cadastrarSetor', async (req, res) => {
     }
 })
 
-
 // Listar Setores
 route.get('/listarSetores', async (req, res) => {
     try {
@@ -304,7 +236,6 @@ route.get('/listarSetores', async (req, res) => {
         res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
     }
 })
-
 
 // Editar Setor
 route.put('/editarSetor/:id', async (req, res) => {
