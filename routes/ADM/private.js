@@ -139,6 +139,7 @@ route.get('/escalasSetor/:matricula_adm', async (req, res) => {
             .eq('id_setor', adm.id_setor)
             .not('id_escala', 'is', null) // filtrar apenas funcionarios com escala vinculada
             .order('nome', { ascending: true }) // ordenar por nome do funcionário
+            .single()
 
         if (error) {    
             return res.status(400).json({ mensagem: 'Erro ao buscar escalas', erro: error })
