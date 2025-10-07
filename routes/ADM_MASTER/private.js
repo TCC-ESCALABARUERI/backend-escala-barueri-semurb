@@ -129,11 +129,12 @@ route.put('/editarFuncionario/:matricula_funcionario', async (req, res) => {
 
     console.log("Payload final para update:", payloadToUpdate);
 
-    const { data: funcionarioAtualizado, error } = await supabase
-      .from('funcionario')
-      .update(payloadToUpdate)
-      .eq('matricula_funcionario', matricula_funcionario)
-      .select('*');
+   const { data: funcionarioAtualizado, error } = await supabase
+  .from('funcionario')
+  .update(payloadToUpdate)
+  .eq('matricula_funcionario', matricula_funcionario)
+  .select('email, telefone, cargo, status_permissao, setor(nome_setor)')
+  .maybeSingle();
 
     if (error) {
       console.log("Erro ao atualizar funcionário:", error);
