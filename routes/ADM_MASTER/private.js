@@ -86,59 +86,68 @@ route.get('/listarFuncionarios_master', async (req, res) => {
 
 // Editar funcionário (dados e permissão, sem senha)
 route.put('/editarFuncionario/:matricula_funcionario', async (req, res) => {
-    try {
-        const { matricula_funcionario } = req.params
-        const { email, telefone, cargo, setor, status_permissao } = req.body
+  try {
+    const { matricula_funcionario } = req.params;
+    const { email, telefone, cargo, setor, status_permissao } = req.body;
 
-        // Buscar dados antigos do funcionário
-        const { data: funcionarioDesatualizado } = await supabase
-            .from('funcionario')
-            .select('*')
-            .eq('matricula_funcionario', matricula_funcionario)
-            .maybeSingle()
+    console.log("Recebido para editar:", { matricula_funcionario, email, telefone, cargo, setor, status_permissao });
 
-        if (!funcionarioDesatualizado) {
-            return res.status(404).json({ mensagem: 'Funcionário não encontrado' })
-        }
+    const { data: funcionarioDesatualizado } = await supabase
+      .from('funcionario')
+      .select('*')
+      .eq('matricula_funcionario', matricula_funcionario)
+      .maybeSingle();
 
-        // Buscar setor para associar ao funcionário
-        let setor_id = funcionarioDesatualizado.id_setor
-        if (setor) {
-            const { data: setorData, error: setorError } = await supabase
-                .from('setor')
-                .select('id_setor')
-                .eq('nome_setor', setor)
-                .maybeSingle()
-
-            if (setorError || !setorData) {
-                return res.status(400).json({ mensagem: 'Setor não encontrado', erro: setorError })
-            }
-            setor_id = setorData.id_setor
-        }
-
-        // Atualizar funcionário
-        const { data: funcionarioAtualizado, error } = await supabase
-            .from('funcionario')
-            .update({
-    email: email !== undefined ? email : funcionarioDesatualizado.email,
-    telefone: telefone !== undefined ? telefone : funcionarioDesatualizado.telefone,
-    cargo: cargo !== undefined ? cargo : funcionarioDesatualizado.cargo,
-    id_setor: setor_id,
-    status_permissao: status_permissao !== undefined ? status_permissao : funcionarioDesatualizado.status_permissao
-})
-            .eq('matricula_funcionario', matricula_funcionario)
-            .select('*')
-
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao atualizar funcionário', erro: error })
-        }
-
-        res.status(200).json({ mensagem: 'Funcionário atualizado com sucesso', funcionario: funcionarioAtualizado[0] }) 
+    if (!funcionarioDesatualizado) {
+      console.log("Funcionário não encontrado.");
+      return res.status(404).json({ mensagem: 'Funcionário não encontrado' });
     }
-    catch (error) {
-        res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+
+    let setor_id = funcionarioDesatualizado.id_setor;
+    if (setor) {
+      const { data: setorData, error: setorError } = await supabase
+        .from('setor')
+        .select('id_setor')
+        .eq('nome_setor', setor)
+        .maybeSingle();
+
+      if (setorError || !setorData) {
+        console.log("Setor não encontrado:", setor);
+        return res.status(400).json({ mensagem: 'Setor não encontrado', erro: setorError });
+      }
+
+      setor_id = setorData.id_setor;
     }
-})
+
+    const payloadToUpdate = {
+      email: email !== undefined ? email : funcionarioDesatualizado.email,
+      telefone: telefone !== undefined ? telefone : funcionarioDesatualizado.telefone,
+      cargo: cargo !== undefined ? cargo : funcionarioDesatualizado.cargo,
+      id_setor: setor_id,
+      status_permissao: status_permissao !== undefined ? status_permissao : funcionarioDesatualizado.status_permissao
+    };
+
+    console.log("Payload final para update:", payloadToUpdate);
+
+    const { data: funcionarioAtualizado, error } = await supabase
+      .from('funcionario')
+      .update(payloadToUpdate)
+      .eq('matricula_funcionario', matricula_funcionario)
+      .select('*');
+
+    if (error) {
+      console.log("Erro ao atualizar funcionário:", error);
+      return res.status(400).json({ mensagem: 'Erro ao atualizar funcionário', erro: error });
+    }
+
+    console.log("Funcionário atualizado com sucesso:", funcionarioAtualizado);
+    return res.status(200).json({ mensagem: 'Funcionário atualizado com sucesso', funcionario: funcionarioAtualizado[0] });
+  } catch (error) {
+    console.error("Erro inesperado:", error);
+    return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message });
+  }
+});
+
 
 // Deletar Funcionário
 route.delete('/deletarFuncionario_master/:matricula_funcionario', async (req, res) => {
