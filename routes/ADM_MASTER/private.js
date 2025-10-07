@@ -120,12 +120,12 @@ route.put('/editarFuncionario/:matricula_funcionario', async (req, res) => {
         const { data: funcionarioAtualizado, error } = await supabase
             .from('funcionario')
             .update({
-                email: email || funcionarioDesatualizado.email,
-                telefone: telefone || funcionarioDesatualizado.telefone,
-                cargo: cargo || funcionarioDesatualizado.cargo,
-                id_setor: setor_id,
-                status_permissao: status_permissao !== undefined ? status_permissao : funcionarioDesatualizado.status_permissao
-            })
+    email: email !== undefined ? email : funcionarioDesatualizado.email,
+    telefone: telefone !== undefined ? telefone : funcionarioDesatualizado.telefone,
+    cargo: cargo !== undefined ? cargo : funcionarioDesatualizado.cargo,
+    id_setor: setor_id,
+    status_permissao: status_permissao !== undefined ? status_permissao : funcionarioDesatualizado.status_permissao
+})
             .eq('matricula_funcionario', matricula_funcionario)
             .select('*')
 
