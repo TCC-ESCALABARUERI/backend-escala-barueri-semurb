@@ -85,10 +85,10 @@ route.get('/listarFuncionarios_master', async (req, res) => {
 })
 
 // Editar funcionário (dados e permissão, sem senha)
-route.put('/editarFuncionario/:matricula_funcionario', async (req, res) => {
+route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) => {
     try {
         const { matricula_funcionario } = req.params
-        const { email, telefone, cargo, setor, status_permissao } = req.body
+        const { email, telefone, cargo, setor, status_permissao,  } = req.body
 
         // Buscar dados antigos do funcionário
         const { data: funcionarioDesatualizado } = await supabase

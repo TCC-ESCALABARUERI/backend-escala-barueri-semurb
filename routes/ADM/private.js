@@ -288,43 +288,71 @@ route.get('/confirmacoesSetor/:matricula_adm', async (req, res) => {
     }
 })
 
-
-// Mostrar funcionários que estão atuando em determinada data
-route.get('/funcionariosAtivos', async (req, res) => {
+// Mostrar funcionários que estão atuando em determinada data (filtrado por setor do ADM)
+route.get('/funcionariosAtivosSetor/:matricula_adm', async (req, res) => {
+    const matricula_adm = req.params.matricula_adm
     try {
-        const { data } = req.query
-        if (!data) {
+        let { data: dataConsulta } = req.query
+        if (!dataConsulta) {
             return res.status(400).json({ mensagem: 'Data é obrigatória no formato DD/MM/YYYY ou YYYY-MM-DD' })
         }
 
-        // Buscar todos funcionários com escala vinculada
+        // aceitar formato DD/MM/YYYY convertendo para ISO YYYY-MM-DD
+        if (typeof dataConsulta === 'string' && dataConsulta.includes('/')) {
+            const partes = dataConsulta.split('/')
+            if (partes.length !== 3) {
+                return res.status(400).json({ mensagem: 'Formato de data inválido. Use DD/MM/YYYY ou YYYY-MM-DD.' })
+            }
+            dataConsulta = `${partes[2]}-${partes[1].padStart(2, '0')}-${partes[0].padStart(2, '0')}`
+        }
+
+        const consultaDate = new Date(dataConsulta)
+        if (isNaN(consultaDate.getTime())) {
+            return res.status(400).json({ mensagem: 'Data inválida' })
+        }
+
+        // buscar setor do adm
+        const { data: adm, error: errorAdm } = await supabase
+            .from('funcionario')
+            .select('id_setor')
+            .eq('matricula_funcionario', matricula_adm)
+            .maybeSingle()
+
+        if (errorAdm) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar ADM', erro: errorAdm })
+        }
+        if (!adm) {
+            return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
+        }
+
+        // Buscar funcionários do mesmo setor com escala vinculada
         const { data: funcionarios, error } = await supabase
             .from('funcionario')
             .select(`
                 matricula_funcionario, nome, id_escala,
                 escala(id_escala, data_inicio, dias_trabalhados, dias_n_trabalhados, tipo_escala, dias_n_trabalhados_escala_semanal)
             `)
+            .eq('id_setor', adm.id_setor)
             .not('id_escala', 'is', null)
 
         if (error) {
             return res.status(400).json({ mensagem: 'Erro ao buscar funcionários', erro: error })
         }
 
-        // Função local para verificar se o funcionário está ativo na data
-        function estaAtivoNaData(func, dataConsulta) {
+        // Função local para verificar se o funcionário está ativo na data (recebe Date)
+        function estaAtivoNaData(func, consulta) {
             const escala = func.escala
             if (!escala || !escala.data_inicio) return false
 
             const inicio = new Date(escala.data_inicio)
-            const consulta = new Date(dataConsulta)
-            if (isNaN(consulta.getTime())) return false
+            if (isNaN(inicio.getTime())) return false
             if (consulta < inicio) return false
 
             const diffDias = Math.floor((consulta - inicio) / (1000 * 60 * 60 * 24))
-            const ciclo = escala.dias_trabalhados + escala.dias_n_trabalhados
+            const ciclo = Number(escala.dias_trabalhados) + Number(escala.dias_n_trabalhados)
             if (ciclo === 0) return false
 
-            // Verificação de folgas semanais
+            // Verificação de folgas semanais (dias específicos)
             if (escala.dias_n_trabalhados_escala_semanal) {
                 let diasFolga = escala.dias_n_trabalhados_escala_semanal
 
@@ -343,7 +371,7 @@ route.get('/funcionariosAtivos', async (req, res) => {
 
                     // Normalizar maiúsculas/minúsculas
                     const diaNormalizado = diaSemana.toLowerCase().trim()
-                    const folgasNormalizadas = diasFolga.map(d => d.toLowerCase().trim())
+                    const folgasNormalizadas = diasFolga.map(d => String(d).toLowerCase().trim())
 
                     if (folgasNormalizadas.includes(diaNormalizado)) {
                         return false // está de folga neste dia
@@ -352,19 +380,17 @@ route.get('/funcionariosAtivos', async (req, res) => {
             }
 
             const posicaoNoCiclo = diffDias % ciclo
-            return posicaoNoCiclo < escala.dias_trabalhados
+            return posicaoNoCiclo < Number(escala.dias_trabalhados)
         }
 
-        // Filtrar os funcionários ativos na data
-        const ativos = funcionarios.filter(func => estaAtivoNaData(func, data))
+        // Filtrar os funcionários ativos na data (apenas do setor do ADM)
+        const ativos = funcionarios.filter(func => estaAtivoNaData(func, consultaDate))
 
         res.status(200).json(ativos)
     } catch (error) {
         return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
     }
 })
-
-
 
 // Cadastrar funcionário no setor do adm
 route.post('/cadastrarFuncionario', async (req, res) => {
