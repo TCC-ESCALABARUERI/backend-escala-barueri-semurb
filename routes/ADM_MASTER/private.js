@@ -85,17 +85,10 @@ route.get('/listarFuncionarios_master', async (req, res) => {
 })
 
 // Editar funcionário (dados e permissão, sem senha)
-<<<<<<< HEAD
 route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) => {
     try {
         const { matricula_funcionario } = req.params
-        const { email, telefone, cargo, setor, status_permissao,  } = req.body
-=======
-route.put('/editarFuncionario/:matricula_funcionario', async (req, res) => {
-  try {
-    const { matricula_funcionario } = req.params;
-    const { email, telefone, cargo, setor, status_permissao } = req.body;
->>>>>>> 6babff2f16eaeb8378b68cdf2f0cf4c9de49befa
+        const { email, telefone, cargo, setor, status_permissao, equipe, regiao } = req.body
 
     console.log("Recebido para editar:", { matricula_funcionario, email, telefone, cargo, setor, status_permissao });
 
