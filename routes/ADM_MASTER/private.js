@@ -90,7 +90,6 @@ route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) =
         const { matricula_funcionario } = req.params
         const { email, telefone, cargo, setor, status_permissao, equipe, regiao } = req.body
 
-    console.log("Recebido para editar:", { matricula_funcionario, email, telefone, cargo, setor, status_permissao });
 
     const { data: funcionarioDesatualizado } = await supabase
       .from('funcionario')
@@ -127,7 +126,6 @@ route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) =
       status_permissao: status_permissao !== undefined ? status_permissao : funcionarioDesatualizado.status_permissao
     };
 
-    console.log("Payload final para update:", payloadToUpdate);
 
    const { data: funcionarioAtualizado, error } = await supabase
   .from('funcionario')
