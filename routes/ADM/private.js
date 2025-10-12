@@ -748,50 +748,27 @@ route.put('/alterarEscala', async (req, res) => {
         const precisa_dias_especificos = usa_dias_especificos === true
 
         // Se a escala exige dias específicos, validar o campo enviado
-        if (precisa_dias_especificos) {
-            if ( 
-                !dias_n_trabalhados_escala_semanal ||
-                !Array.isArray(dias_n_trabalhados_escala_semanal) ||
-                dias_n_trabalhados_escala_semanal.length === 0
-            ) {
-                return res.status(400).json({
-                    mensagem: 'Escala exige dias de folga específicos. Informe "dias_n_trabalhados_escala_semanal" como array.'
-                })
-            }
+       let diasArray = [];
+    if (precisa_dias_especificos) {
+      diasArray = Array.isArray(dias_n_trabalhados_escala_semanal)
+        ? dias_n_trabalhados_escala_semanal
+        : typeof dias_n_trabalhados_escala_semanal === 'string'
+          ? JSON.parse(dias_n_trabalhados_escala_semanal)
+          : [];
 
-            const diasValidos = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
-            const diasInvalidos = dias_n_trabalhados_escala_semanal.filter(d => !diasValidos.includes(d))
+      if (diasArray.length === 0)
+        return res.status(400).json({ mensagem: 'Informe os dias específicos de folga.' });
 
-            if (diasInvalidos.length > 0) {
-                return res.status(400).json({
-                    mensagem: `Os seguintes dias são inválidos: ${diasInvalidos.join(', ')}`,
-                    dias_validos: diasValidos
-                })
-            }
-        }
+      const diasValidos = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+      const diasInvalidos = diasArray.filter(d => !diasValidos.includes(d));
+      if (diasInvalidos.length > 0)
+        return res.status(400).json({ mensagem: `Dias inválidos: ${diasInvalidos.join(', ')}` });
 
-        // verificar se os dias especificos se igualam a quantidade de dias não trabalhados
-        // mapear a quantidade de dias em dias_n_trabalhados_semanal
-        if (precisa_dias_especificos) {
-            const diasMapeados = {
-                'Dom': 0,
-                'Seg': 1,
-                'Ter': 2,
-                'Qua': 3,
-                'Qui': 4,                   
-                'Sex': 5,
-                'Sab': 6
-            }
-            const diasUnicos = [...new Set(dias_n_trabalhados_escala_semanal)]
-            const quantidadeDias = diasUnicos.length
-
-            if (quantidadeDias !== dias_n_trabalhados) {
-                return res.status(400).json({
-                    mensagem: `A quantidade de dias não trabalhados (${dias_n_trabalhados}) não corresponde à quantidade de dias específicos fornecidos (${quantidadeDias}).`,
-                    detalhes: 'Verifique os dias específicos e ajuste conforme necessário.'
-                })
-            }
-        }
+      if (diasArray.length !== dias_n_trabalhados)
+        return res.status(400).json({
+          mensagem: `Quantidade de dias não trabalhados (${dias_n_trabalhados}) difere de dias informados (${diasArray.length}).`
+        });
+    }
 
         // Verificar se funcionário existe
         const { data: funcionarioExistente, error: errorFuncionario } = await supabase
