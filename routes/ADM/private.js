@@ -821,7 +821,9 @@ route.put('/alterarEscala', async (req, res) => {
                 tipo_escala,
                 dias_trabalhados,
                 dias_n_trabalhados,
-                dias_n_trabalhados_escala_semanal: precisa_dias_especificos ? dias_n_trabalhados_escala_semanal : null
+                dias_n_trabalhados_escala_semanal: precisa_dias_especificos ? dias_n_trabalhados_escala_semanal : [],
+                usa_dias_especificos: precisa_dias_especificos
+
             })
             .eq('id_escala', funcionarioExistente.id_escala)
             .select()
