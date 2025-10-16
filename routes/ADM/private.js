@@ -562,7 +562,11 @@ route.post('/cadastrarEscala', async (req, res) => {
         }
 
         const { dias_trabalhados, dias_n_trabalhados } = escalaInfo
-        const precisa_dias_especificos = usa_dias_especificos === true
+        const precisa_dias_especificos =
+  usa_dias_especificos === true ||
+  usa_dias_especificos === 'true' ||
+  usa_dias_especificos === 1
+
 
         // Se a escala exige dias específicos, validar o campo enviado
         if (precisa_dias_especificos) {
