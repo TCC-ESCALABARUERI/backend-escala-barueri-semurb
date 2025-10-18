@@ -51,7 +51,7 @@ route.post('/loginFuncionario', async (req, res) => {
       .select('*')
       .eq('matricula_funcionario', funcionario.matricula_funcionario)
       .order('enviada_em', { ascending: false })
-      .single()
+    
       
     ])
 
