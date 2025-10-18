@@ -492,8 +492,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
             .insert([{
                 matricula_funcionario: matricula_funcionario,
                 tipo_notificacao: 'Boas Vindas',
-                mensagem: `Olá ${nome}! Bem vindo ao sistema de gerenciamento de escalas.
-                Sua matrícula é ${matricula_funcionario}. Por favor, altere sua senha após o primeiro acesso.`,
+                mensagem: `Bem vindo ao sistema de gerenciamento de escalas.    Sua matrícula é ${matricula_funcionario}. Por favor, altere sua senha após o primeiro acesso.`,
                 lida: false,
                 enviada_em: new Date().toISOString()
             }])
