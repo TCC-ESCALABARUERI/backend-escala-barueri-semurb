@@ -12,6 +12,94 @@ function validarCampos(campos, body) {
     return null
 }
 
+//contabilizar funcionarios por equipe
+route.get('/funcionariosEquipe/:id_equipe', async (req, res) => {
+    try{
+
+        const id_equipe = req.params
+
+        if (!id_equipe) {
+            return res.status(400).json({ mensagem: 'ID do setor é obrigatório' })
+        }
+
+        //buscar funcionarios que possuem o id da equipe
+        const { data: funcionariosEquipe, error } = await supabase
+            .from('funcionario')
+            .select('equipe(nome_equipe)')
+            .eq('id_equipe', id_equipe.id_equipe)
+            .not('id_equipe', 'is', null)
+
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar funcionários da equipe', erro: error })
+        }
+
+        const quantidadeFuncionarios = funcionariosEquipe.length
+        res.status(200).json({ quantidade: quantidadeFuncionarios })
+
+
+
+
+    } catch(error) {
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+})
+
+// contabilizar funcionarios por escala
+route.get('/funcionariosEscala/:matricula_adm', async (req, res) => {
+    try {
+        const { matricula_adm } = req.params
+
+        if (!matricula_adm) {
+            return res.status(400).json({ mensagem: 'Matrícula do ADM é obrigatória' })
+        }
+        
+        // buscar setor do adm
+        const { data: adm, error: errorAdm } = await supabase
+            .from('funcionario')
+            .select('id_setor')
+            .eq('matricula_funcionario', matricula_adm)
+            .maybeSingle()
+
+        if (errorAdm) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar ADM', erro: errorAdm })
+        }
+
+        if (!adm) { 
+            return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
+        }
+
+        // buscar funcionarios do setor que possuam id_escala e trazer apenas o tipo_escala
+        const { data: funcionariosComEscala, error } = await supabase
+            .from('funcionario')
+            .select('escala(tipo_escala)')
+            .eq('id_setor', adm.id_setor)
+            .not('id_escala', 'is', null)
+
+        if (error) {
+            return res.status(400).json({ mensagem: 'Erro ao buscar funcionários com escala', erro: error })
+        }
+
+        // Agregar contagem por tipo_escala
+        const mapa = new Map()
+        for (const f of funcionariosComEscala) {
+            const tipo = f.escala && f.escala.tipo_escala ? f.escala.tipo_escala : 'Não informado'
+            if (!mapa.has(tipo)) {
+                mapa.set(tipo, {
+                    tipo_escala: tipo,
+                    quantidade: 0
+                })
+            }
+            mapa.get(tipo).quantidade += 1
+        }
+
+        const contagem = Array.from(mapa.values())
+
+        res.status(200).json(contagem)
+    } catch (error) {
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }   
+})
+
 // listar equipes do setor (apenas equipes com funcionários no setor)
 route.get('/equipesSetor/:matricula_adm', async (req, res) => {
     const { matricula_adm } = req.params
