@@ -154,7 +154,7 @@ route.post('/verificacaoCodigoAdm', async (req, res) => {
             return res.status(400).json({ mensagem: 'Código de verificação expirado' })
         }
 
-        return res.status(200).json({ mensagem: 'Código de verificação válido' })
+        return res.status(200).json({ mensagem: 'Código de verificação válido', codigo })
     } catch (error) {
         console.log(error)
         return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message }) 
@@ -212,6 +212,22 @@ route.put('/redefinirSenhaAdm', async (req, res) => {
     }
 })
 
+// deletar todos os codigos do usuario apos a redefinição de senha
+route.delete('/deletarCodigosAdm/:matricula_funcionario', async (req, res) => {
+    try {
+        const { matricula_funcionario } = req.params
 
+        const { data, error } = await supabase
+            .from('codigo_validacao')
+            .delete()
+            .eq('matricula_funcionario', matricula_funcionario)
+
+        if (error) return res.status(400).json({ mensagem: 'Erro ao deletar códigos de verificação', erro: error })
+
+        return res.status(200).json({ mensagem: 'Códigos de verificação deletados com sucesso' })
+    } catch (error) {
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    }
+})
 
 export default route
