@@ -69,21 +69,11 @@ route.post('/loginAdm', async (req, res) => {
 // Envio de código de verificação por email para ADM
 route.post('/envioVerificacaoAdm_email', async (req, res) => {
     try {
-        const obrigatorios = ['email', 'matricula_funcionario']
+        const obrigatorios = ['email']
         const campoFaltando = validarCampos(obrigatorios, req.body)
         if (campoFaltando) return res.status(400).json({ mensagem: `Campo obrigatório ausente: ${campoFaltando}` })
 
-        const { email, matricula_funcionario } = req.body
-
-        const { data: funcionario } = await supabase
-            .from('funcionario')
-            .select('*')
-            .eq('matricula_funcionario', matricula_funcionario)
-            .maybeSingle()
-
-            if(!funcionario) {
-                return res.status(400).json({mensagem: 'Erro ao buscar usuário'})
-            }
+        const { email } = req.body
 
         const { data: emailFuncionario, error } = await supabase
             .from('funcionario')
@@ -92,12 +82,8 @@ route.post('/envioVerificacaoAdm_email', async (req, res) => {
             .maybeSingle()
 
         if (error) return res.status(400).json({ mensagem: 'Erro ao buscar email do funcionŕio', erro: error })
-        if (!funcionario) return res.status(404).json({ mensagem: 'Usuário não encontrado' })
 
-        // verificar se existe a permissao de adm
-        if (funcionario.status_permissao !== 'Sim') {
-            return res.status(403).json({ mensagem: 'Acesso negado: Permissão de administrador necessária' })
-        }
+        const matricula_funcionario = emailFuncionario.matricula_funcionario
 
         // Gerar um código de verificação (pode ser um número aleatório ou uma string)
         const codigoVerificacao = Math.floor(100000 + Math.random() * 900000).toString() // Exemplo: código de 6 dígitos
@@ -130,8 +116,9 @@ route.post('/envioVerificacaoAdm_email', async (req, res) => {
                 matricula_funcionario: matricula_funcionario
             }])
 
-        res.status(200).json({ mensagem: 'Código de verificação enviado com sucesso', codigoVerificacao })
+        res.status(200).json({ mensagem: 'Código de verificação enviado com sucesso', codigoVerificacao, matricula_funcionario })
     } catch (error) {
+        console.log(error)
         return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
     }
 })
@@ -169,7 +156,8 @@ route.post('/verificacaoCodigoAdm', async (req, res) => {
 
         return res.status(200).json({ mensagem: 'Código de verificação válido' })
     } catch (error) {
-        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+        console.log(error)
+        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message }) 
     }
 })
 
