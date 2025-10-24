@@ -36,24 +36,25 @@ route.post('/loginFuncionario', async (req, res) => {
     )
 
     // Busca informações relacionadas em paralelo
-    const [escalaRes,turnoRes, setorRes, regiaoRes, equipeRes, confirmacaoRes, notificacoesRes] = await Promise.all([
-      supabase.from('escala').select('*').eq('id_escala', funcionario.id_escala).maybeSingle(),
-      supabase.from('turno').select('*').eq('id_turno', funcionario.id_turno).maybeSingle(),
-      supabase.from('setor').select('*').eq('id_setor', funcionario.id_setor).maybeSingle(),
-      supabase.from('regiao').select('*').eq('id_regiao', funcionario.id_regiao).maybeSingle(),
-      supabase.from('equipe').select('*').eq('id_equipe', funcionario.id_equipe).maybeSingle(),
-      supabase.from('escala_confirmacao')
-        .select('*')
-        .eq('matricula_funcionario', funcionario.matricula_funcionario)
-        .order('data_confirmacao', { ascending: false })
-        .limit(1),
-      supabase.from('notificacoes')
-      .select('*')
-      .eq('matricula_funcionario', funcionario.matricula_funcionario)
-      .order('enviada_em', { ascending: false })
-    
-      
-    ])
+    const [escalaRes, turnoRes, setorRes, regiaoRes, equipeRes, confirmacaoRes, notificacoesRes] =
+      await Promise.all([
+        supabase.from('escala').select('*').eq('id_escala', funcionario.id_escala).maybeSingle(),
+        supabase.from('turno').select('*').eq('id_turno', funcionario.id_turno).maybeSingle(),
+        supabase.from('setor').select('*').eq('id_setor', funcionario.id_setor).maybeSingle(),
+        supabase.from('regiao').select('*').eq('id_regiao', funcionario.id_regiao).maybeSingle(),
+        supabase.from('equipe').select('*').eq('id_equipe', funcionario.id_equipe).maybeSingle(),
+        supabase
+          .from('escala_confirmacao')
+          .select('*')
+          .eq('matricula_funcionario', funcionario.matricula_funcionario)
+          .order('data_confirmacao', { ascending: false })
+          .limit(1),
+        supabase
+          .from('notificacoes')
+          .select('*')
+          .eq('matricula_funcionario', funcionario.matricula_funcionario)
+          .order('enviada_em', { ascending: false })
+      ])
 
     return res.status(200).json({
       mensagem: 'Login bem-sucedido',
@@ -71,6 +72,5 @@ route.post('/loginFuncionario', async (req, res) => {
     return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
   }
 })
-
 
 export default route

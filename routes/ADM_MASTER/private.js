@@ -6,116 +6,123 @@ const route = express.Router()
 
 // Cadastrar Funcionário
 route.post('/cadastrarFuncionario_master', async (req, res) => {
-    try {
-        const { matricula_funcionario, nome, email, telefone, cargo, setor, status_permissao } = req.body
+  try {
+    const { matricula_funcionario, nome, email, telefone, cargo, setor, status_permissao } =
+      req.body
 
-        if (!matricula_funcionario || !nome || !email || !telefone || !cargo || !setor || !status_permissao) {
-            return res.status(400).json({ mensagem: 'Preencha todos os campos obrigatórios' })
-        }
-
-        const senha = matricula_funcionario.toString()
-
-        // Criptografar senha
-        const salt = await bcrypt.genSalt(10)
-        const senhaHash = await bcrypt.hash(senha, salt)
-
-        // Verificar se matrícula já existe
-        const { data: funcionarioExistente } = await supabase
-            .from('funcionario')
-            .select('*')
-            .eq('matricula_funcionario', matricula_funcionario)
-            .maybeSingle()
-
-        if (funcionarioExistente) {
-            return res.status(400).json({ mensagem: 'Matrícula já cadastrada' })
-        }
-
-        // buscar setor para associar ao funcionário
-        const { data: setorData, error: setorError } = await supabase
-            .from('setor')
-            .select('id_setor')
-            .eq('nome_setor', setor)
-            .maybeSingle()
-            
-        if (setorError || !setorData) {
-            return res.status(400).json({ mensagem: 'Setor não encontrado', erro: setorError })
-        }
-
-        // Inserir funcionário
-        const { data, error } = await supabase
-            .from('funcionario')
-            .insert([{
-                matricula_funcionario: matricula_funcionario,
-                nome: nome,
-                email: email,
-                senha: senhaHash,
-                telefone: telefone,
-                cargo: cargo,
-                id_setor: setorData.id_setor,
-                status_permissao: status_permissao
-            }])
-            .select()
-
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao inserir dados', erro: error })
-        }
-
-        res.status(201).json({ mensagem: 'Funcionário cadastrado com sucesso', funcionario: data[0] })
-
-    } catch (error) {
-        return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    if (
+      !matricula_funcionario ||
+      !nome ||
+      !email ||
+      !telefone ||
+      !cargo ||
+      !setor ||
+      !status_permissao
+    ) {
+      return res.status(400).json({ mensagem: 'Preencha todos os campos obrigatórios' })
     }
+
+    const senha = matricula_funcionario.toString()
+
+    // Criptografar senha
+    const salt = await bcrypt.genSalt(10)
+    const senhaHash = await bcrypt.hash(senha, salt)
+
+    // Verificar se matrícula já existe
+    const { data: funcionarioExistente } = await supabase
+      .from('funcionario')
+      .select('*')
+      .eq('matricula_funcionario', matricula_funcionario)
+      .maybeSingle()
+
+    if (funcionarioExistente) {
+      return res.status(400).json({ mensagem: 'Matrícula já cadastrada' })
+    }
+
+    // buscar setor para associar ao funcionário
+    const { data: setorData, error: setorError } = await supabase
+      .from('setor')
+      .select('id_setor')
+      .eq('nome_setor', setor)
+      .maybeSingle()
+
+    if (setorError || !setorData) {
+      return res.status(400).json({ mensagem: 'Setor não encontrado', erro: setorError })
+    }
+
+    // Inserir funcionário
+    const { data, error } = await supabase
+      .from('funcionario')
+      .insert([
+        {
+          matricula_funcionario: matricula_funcionario,
+          nome: nome,
+          email: email,
+          senha: senhaHash,
+          telefone: telefone,
+          cargo: cargo,
+          id_setor: setorData.id_setor,
+          status_permissao: status_permissao
+        }
+      ])
+      .select()
+
+    if (error) {
+      return res.status(400).json({ mensagem: 'Erro ao inserir dados', erro: error })
+    }
+
+    res.status(201).json({ mensagem: 'Funcionário cadastrado com sucesso', funcionario: data[0] })
+  } catch (error) {
+    return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  }
 })
 
 // Listar Funcionários
 route.get('/listarFuncionarios_master', async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('funcionario')
-            .select('*')
+  try {
+    const { data, error } = await supabase.from('funcionario').select('*')
 
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao listar funcionários', erro: error })
-        }
-
-        res.status(200).json({ funcionarios: data })
-    } catch (error) {
-        res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    if (error) {
+      return res.status(400).json({ mensagem: 'Erro ao listar funcionários', erro: error })
     }
+
+    res.status(200).json({ funcionarios: data })
+  } catch (error) {
+    res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  }
 })
 
 // Editar funcionário (dados e permissão, sem senha)
 route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) => {
-    try {
-        const { matricula_funcionario } = req.params
-        const { email, telefone, cargo, setor, status_permissao, equipe, regiao } = req.body
-
+  try {
+    const { matricula_funcionario } = req.params
+    const { email, telefone, cargo, setor, status_permissao, equipe, regiao } = req.body
 
     const { data: funcionarioDesatualizado } = await supabase
       .from('funcionario')
       .select('*')
       .eq('matricula_funcionario', matricula_funcionario)
-      .maybeSingle();
+      .maybeSingle()
 
     if (!funcionarioDesatualizado) {
-      console.log("Funcionário não encontrado.");
-      return res.status(404).json({ mensagem: 'Funcionário não encontrado' });
+      console.log('Funcionário não encontrado.')
+      return res.status(404).json({ mensagem: 'Funcionário não encontrado' })
     }
 
-    let setor_id = funcionarioDesatualizado.id_setor;
+    let setor_id = funcionarioDesatualizado.id_setor
     if (setor) {
       const { data: setorData, error: setorError } = await supabase
         .from('setor')
         .select('id_setor')
         .eq('nome_setor', setor)
-        .maybeSingle();
+        .maybeSingle()
 
       if (setorError || !setorData) {
-        console.log("Setor não encontrado:", setor);
-        return res.status(400).json({ mensagem: 'Setor não encontrado', erro: setorError });
+        console.log('Setor não encontrado:', setor)
+        return res.status(400).json({ mensagem: 'Setor não encontrado', erro: setorError })
       }
 
-      setor_id = setorData.id_setor;
+      setor_id = setorData.id_setor
     }
 
     const payloadToUpdate = {
@@ -123,174 +130,166 @@ route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) =
       telefone: telefone !== undefined ? telefone : funcionarioDesatualizado.telefone,
       cargo: cargo !== undefined ? cargo : funcionarioDesatualizado.cargo,
       id_setor: setor_id,
-      status_permissao: status_permissao !== undefined ? status_permissao : funcionarioDesatualizado.status_permissao
-    };
-
-
-   const { data: funcionarioAtualizado, error } = await supabase
-  .from('funcionario')
-  .update(payloadToUpdate)
-  .eq('matricula_funcionario', matricula_funcionario)
-  .select('email, telefone, cargo, status_permissao, setor(nome_setor)')
-  .maybeSingle();
-
-    if (error) {
-      console.log("Erro ao atualizar funcionário:", error);
-      return res.status(400).json({ mensagem: 'Erro ao atualizar funcionário', erro: error });
+      status_permissao:
+        status_permissao !== undefined
+          ? status_permissao
+          : funcionarioDesatualizado.status_permissao
     }
 
-    console.log("Funcionário atualizado com sucesso:", funcionarioAtualizado);
-    return res.status(200).json({ mensagem: 'Funcionário atualizado com sucesso', funcionario: funcionarioAtualizado[0] });
-  } catch (error) {
-    console.error("Erro inesperado:", error);
-    return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message });
-  }
-});
+    const { data: funcionarioAtualizado, error } = await supabase
+      .from('funcionario')
+      .update(payloadToUpdate)
+      .eq('matricula_funcionario', matricula_funcionario)
+      .select('email, telefone, cargo, status_permissao, setor(nome_setor)')
+      .maybeSingle()
 
+    if (error) {
+      console.log('Erro ao atualizar funcionário:', error)
+      return res.status(400).json({ mensagem: 'Erro ao atualizar funcionário', erro: error })
+    }
+
+    console.log('Funcionário atualizado com sucesso:', funcionarioAtualizado)
+    return res.status(200).json({
+      mensagem: 'Funcionário atualizado com sucesso',
+      funcionario: funcionarioAtualizado[0]
+    })
+  } catch (error) {
+    console.error('Erro inesperado:', error)
+    return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  }
+})
 
 // Deletar Funcionário
 route.delete('/deletarFuncionario_master/:matricula_funcionario', async (req, res) => {
   try {
-    const { matricula_funcionario } = req.params;
+    const { matricula_funcionario } = req.params
 
     // apaga as notificacoes do funcoinario primeiro
     const { error: notifError } = await supabase
       .from('notificacoes')
       .delete()
-      .eq('matricula_funcionario', matricula_funcionario);
+      .eq('matricula_funcionario', matricula_funcionario)
 
     if (notifError) {
-      return res.status(400).json({ mensagem: 'Erro ao deletar notificações', erro: notifError });
+      return res.status(400).json({ mensagem: 'Erro ao deletar notificações', erro: notifError })
     }
 
     // depois apaga confirmacoes
     const { error: confirmError } = await supabase
       .from('escala_confirmacao')
       .delete()
-      .eq('matricula_funcionario', matricula_funcionario);
+      .eq('matricula_funcionario', matricula_funcionario)
 
     if (confirmError) {
-      return res.status(400).json({ mensagem: 'Erro ao deletar conformações', erro: confirmError });
+      return res.status(400).json({ mensagem: 'Erro ao deletar conformações', erro: confirmError })
     }
 
     //depois apaga o funcionario
     const { error: funcError } = await supabase
       .from('funcionario')
       .delete()
-      .eq('matricula_funcionario', matricula_funcionario);
+      .eq('matricula_funcionario', matricula_funcionario)
 
     if (funcError) {
-      return res.status(400).json({ mensagem: 'Erro ao deletar funcionário', erro: funcError });
+      return res.status(400).json({ mensagem: 'Erro ao deletar funcionário', erro: funcError })
     }
 
-    res.status(200).json({ mensagem: 'Funcionário deletado com sucesso' });
-
+    res.status(200).json({ mensagem: 'Funcionário deletado com sucesso' })
   } catch (error) {
-    res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message });
+    res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
   }
-});
-
+})
 
 //Setores
 
 // Criar Setor
 route.post('/cadastrarSetor', async (req, res) => {
-    try {
-        const { nome_setor } = req.body
+  try {
+    const { nome_setor } = req.body
 
-        if (!nome_setor) {
-            return res.status(400).json({ mensagem: 'Informe o nome do setor' })
-        }
-
-        // Verificar se já existe
-        const { data: setorExistente } = await supabase
-            .from('setor')
-            .select('*')
-            .eq('nome_setor', nome_setor)
-            .maybeSingle()
-
-        if (setorExistente) {
-            return res.status(400).json({ mensagem: 'Setor já cadastrado' })
-        }
-
-        const { data, error } = await supabase
-            .from('setor')
-            .insert([{ nome_setor }])
-            .select('*')
-
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao cadastrar setor', erro: error })
-        }
-
-        res.status(201).json({ mensagem: 'Setor cadastrado com sucesso', setor: data[0] })
-    } catch (error) {
-        res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    if (!nome_setor) {
+      return res.status(400).json({ mensagem: 'Informe o nome do setor' })
     }
+
+    // Verificar se já existe
+    const { data: setorExistente } = await supabase
+      .from('setor')
+      .select('*')
+      .eq('nome_setor', nome_setor)
+      .maybeSingle()
+
+    if (setorExistente) {
+      return res.status(400).json({ mensagem: 'Setor já cadastrado' })
+    }
+
+    const { data, error } = await supabase.from('setor').insert([{ nome_setor }]).select('*')
+
+    if (error) {
+      return res.status(400).json({ mensagem: 'Erro ao cadastrar setor', erro: error })
+    }
+
+    res.status(201).json({ mensagem: 'Setor cadastrado com sucesso', setor: data[0] })
+  } catch (error) {
+    res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  }
 })
 
 // Listar Setores
 route.get('/listarSetores', async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('setor')
-            .select('id_setor, nome_setor')
+  try {
+    const { data, error } = await supabase.from('setor').select('id_setor, nome_setor')
 
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao listar setores', erro: error })
-        }
-
-        res.status(200).json({ setores: data })
-    } catch (error) {
-        res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    if (error) {
+      return res.status(400).json({ mensagem: 'Erro ao listar setores', erro: error })
     }
+
+    res.status(200).json({ setores: data })
+  } catch (error) {
+    res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  }
 })
 
 // Editar Setor
 route.put('/editarSetor/:id', async (req, res) => {
-    try {
-        const { id } = req.params
-        const { nome_setor } = req.body
+  try {
+    const { id } = req.params
+    const { nome_setor } = req.body
 
-        if (!nome_setor) {
-            return res.status(400).json({ mensagem: 'Informe o nome do setor' })
-        }
-
-        const { data, error } = await supabase
-            .from('setor')
-            .update({ nome_setor })
-            .eq('id_setor', id)
-            .select('*')
-
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao atualizar setor', erro: error })
-        }
-
-        res.status(200).json({ mensagem: 'Setor atualizado com sucesso', setor: data[0] })
-    } catch (error) {
-        res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    if (!nome_setor) {
+      return res.status(400).json({ mensagem: 'Informe o nome do setor' })
     }
-})
 
+    const { data, error } = await supabase
+      .from('setor')
+      .update({ nome_setor })
+      .eq('id_setor', id)
+      .select('*')
+
+    if (error) {
+      return res.status(400).json({ mensagem: 'Erro ao atualizar setor', erro: error })
+    }
+
+    res.status(200).json({ mensagem: 'Setor atualizado com sucesso', setor: data[0] })
+  } catch (error) {
+    res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  }
+})
 
 // Deletar Setor
 route.delete('/deletarSetor/:id', async (req, res) => {
-    try {
-        const { id } = req.params
+  try {
+    const { id } = req.params
 
-        const { error } = await supabase
-            .from('setor')
-            .delete()
-            .eq('id_setor', id)
+    const { error } = await supabase.from('setor').delete().eq('id_setor', id)
 
-        if (error) {
-            return res.status(400).json({ mensagem: 'Erro ao deletar setor', erro: error })
-        }
-
-        res.status(200).json({ mensagem: 'Setor deletado com sucesso' })
-    } catch (error) {
-        res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    if (error) {
+      return res.status(400).json({ mensagem: 'Erro ao deletar setor', erro: error })
     }
-})
 
+    res.status(200).json({ mensagem: 'Setor deletado com sucesso' })
+  } catch (error) {
+    res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  }
+})
 
 export default route

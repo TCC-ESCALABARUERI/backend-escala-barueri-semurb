@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "node --watch index.js"
+    "dev": "node --watch index.js",
+    "format": "prettier --write ."
   },
   "keywords": [],
   "author": "",
@@ -20,5 +21,8 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "postgres": "^3.4.7"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2"
   }
 }

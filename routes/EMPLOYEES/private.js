@@ -18,7 +18,9 @@ route.put('/confirmacaoEscala/:matricula_funcionario', async (req, res) => {
       .limit(1)
 
     if (erroBusca) {
-      return res.status(500).json({ message: 'Erro ao buscar confirmação.', error: erroBusca.message })
+      return res
+        .status(500)
+        .json({ message: 'Erro ao buscar confirmação.', error: erroBusca.message })
     }
 
     if (ultimaConfirmacao && ultimaConfirmacao.length > 0) {
@@ -40,7 +42,9 @@ route.put('/confirmacaoEscala/:matricula_funcionario', async (req, res) => {
         .single()
 
       if (erroUpdate) {
-        return res.status(500).json({ message: 'Erro ao confirmar escala.', error: erroUpdate.message })
+        return res
+          .status(500)
+          .json({ message: 'Erro ao confirmar escala.', error: erroUpdate.message })
       }
 
       return res.status(200).json({ message: 'Escala confirmada com sucesso.', confirmada })
@@ -52,47 +56,45 @@ route.put('/confirmacaoEscala/:matricula_funcionario', async (req, res) => {
   }
 })
 
-
 // alteração de senha
 
 route.put('/alterarSenha', async (req, res) => {
-    const { matricula_funcionario, nova_senha, confirmar_nova_senha } = req.body;
+  const { matricula_funcionario, nova_senha, confirmar_nova_senha } = req.body
 
-    try {
-        // validação de entrada
-        if (!matricula_funcionario || !nova_senha || !confirmar_nova_senha) {
-            return res.status(400).json({ message: 'Matrícula e nova senha são obrigatórias.' });
-        }
-
-        // vericar se ambas a senhas são iguais
-        if (nova_senha != confirmar_nova_senha) {
-          return res.status(400).json({ message: 'Senhas diferentes! Verifique e tente novamente.'})
-        }
-
-        // gerar hash da nova senha
-        const saltRounds = parseInt(process.env.SALT_ROUNDS) || 10;
-        const hashedPassword = await bcrypt.hash(nova_senha, saltRounds);
-
-        // atualizar a senha no banco de dados   
-        const { data, error } = await supabase
-            .from('funcionario')
-            .update({ senha: hashedPassword })
-            .eq('matricula_funcionario', matricula_funcionario)
-            .select('matricula_funcionario, nome') // não retorna senha
-
-        if (error) {
-            throw error;
-        }
-
-        if (!data || data.length === 0) {
-            return res.status(404).json({ message: 'Funcionário não encontrado.' })
-        }
-
-        res.status(200).json({ message: 'Senha alterada com sucesso.', funcionario: data[0] })
-    } catch (error) {
-        res.status(500).json({ message: 'Erro ao alterar senha.', error: error.message })
+  try {
+    // validação de entrada
+    if (!matricula_funcionario || !nova_senha || !confirmar_nova_senha) {
+      return res.status(400).json({ message: 'Matrícula e nova senha são obrigatórias.' })
     }
-})
 
+    // vericar se ambas a senhas são iguais
+    if (nova_senha != confirmar_nova_senha) {
+      return res.status(400).json({ message: 'Senhas diferentes! Verifique e tente novamente.' })
+    }
+
+    // gerar hash da nova senha
+    const saltRounds = parseInt(process.env.SALT_ROUNDS) || 10
+    const hashedPassword = await bcrypt.hash(nova_senha, saltRounds)
+
+    // atualizar a senha no banco de dados
+    const { data, error } = await supabase
+      .from('funcionario')
+      .update({ senha: hashedPassword })
+      .eq('matricula_funcionario', matricula_funcionario)
+      .select('matricula_funcionario, nome') // não retorna senha
+
+    if (error) {
+      throw error
+    }
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({ message: 'Funcionário não encontrado.' })
+    }
+
+    res.status(200).json({ message: 'Senha alterada com sucesso.', funcionario: data[0] })
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao alterar senha.', error: error.message })
+  }
+})
 
 export default route

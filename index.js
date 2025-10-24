@@ -1,4 +1,4 @@
-import express from "express"
+import express from 'express'
 import cors from 'cors'
 
 //Importação das Rotas
@@ -18,33 +18,33 @@ import authToken from './middlewares/authToken.js'
 
 const app = express()
 app.use(cors())
-app.use(express.json()) 
+app.use(express.json())
 
 //Definição das Rotas
 
 // Rotas Públicas
 app.use(
-    '/', 
-    // ADM Master
-    loginMaster,
-    // ADM
-    loginAdm,
-    // User
-    loginFuncionario,
+  '/',
+  // ADM Master
+  loginMaster,
+  // ADM
+  loginAdm,
+  // User
+  loginFuncionario
 )
 
 // Rotas Privadas
 app.use(
-    '/', 
-    authToken,
-    // ADM Master
-    routePrivateMaster,
-    // ADM
-    routePrivateAdm,
-    // User
-    routePrivateFuncionario
+  '/',
+  authToken,
+  // ADM Master
+  routePrivateMaster,
+  // ADM
+  routePrivateAdm,
+  // User
+  routePrivateFuncionario
 )
 
 app.listen(3000, () => {
-    console.log('Servidor rodando na porta 3000')
+  console.log('Servidor rodando na porta 3000')
 })
