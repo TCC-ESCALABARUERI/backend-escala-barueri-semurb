@@ -12,6 +12,33 @@ function validarCampos(campos, body) {
   return null
 }
 
+
+async function criarNotificacao({
+  matricula_funcionario = null,
+  tipo_notificacao = 'GENÉRICA',
+  mensagem = '',
+  matricula_responsavel = null
+}) {
+  try {
+    const { error } = await supabase.from('notificacoes').insert([
+      {
+        matricula_funcionario,
+        tipo_notificacao,
+        mensagem,
+        matricula_responsavel,
+        lida: false,
+        enviada_em: new Date().toISOString()
+      }
+    ])
+    if (error) {
+      // não interrompe a operação principal, apenas loga
+      console.error('Erro ao criar notificação:', error)
+    }
+  } catch (err) {
+    console.error('Erro inesperado ao criar notificação:', err)
+  }
+}
+
 //contabilizar funcionarios por equipe
 route.get('/funcionariosEquipe/:id_equipe', async (req, res) => {
   try {
@@ -533,6 +560,8 @@ route.post('/cadastrarFuncionario', async (req, res) => {
         .json({
           mensagem: 'Equipe não encontrada. Cadastre a equipe antes de vincular ao funcionário.'
         })
+    } else {
+      equipeId = equipeExistente.id_equipe
     }
 
     let regiaoId
@@ -544,10 +573,10 @@ route.post('/cadastrarFuncionario', async (req, res) => {
       .maybeSingle()
 
     if (regiaoExistente) {
-      // see regiao existe usa o id
+      // se regiao existe usa o id
       regiaoId = regiaoExistente.id_regiao
     } else {
-      //se regiao nao existe cria outra
+      // se regiao nao existe cria outra
       const { data: novaRegiao, error: errorNovaRegiao } = await supabase
         .from('regiao')
         .insert([{ nome_regiao: nome_regiao }])
@@ -561,6 +590,13 @@ route.post('/cadastrarFuncionario', async (req, res) => {
       }
 
       regiaoId = novaRegiao.id_regiao
+
+      // notificar criação de região
+      await criarNotificacao({
+        tipo_notificacao: 'CADASTRO_REGIAO',
+        mensagem: `Região criada: ${nome_regiao}`,
+        matricula_responsavel: matricula_adm
+      })
     }
 
     // Verificar se matrícula já existe
@@ -603,7 +639,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
       return res.status(400).json({ mensagem: 'Erro ao inserir dados', erro: error })
     }
 
-    // gerar primeira notificação
+    // gerar primeira notificação (Boas Vindas)
     const { data: notificacao, error: errorNotificacao } = await supabase
       .from('notificacoes')
       .insert([
@@ -619,8 +655,16 @@ route.post('/cadastrarFuncionario', async (req, res) => {
       .single()
 
     if (errorNotificacao) {
-      return res.status(400).json({ mensagem: 'Erro ao criar notificação', erro: errorNotificacao })
+      console.error('Erro ao criar notificação de boas-vindas:', errorNotificacao)
     }
+
+    // notificar cadastro de funcionário (registro geral)
+    await criarNotificacao({
+      matricula_funcionario,
+      tipo_notificacao: 'CADASTRO_FUNCIONARIO',
+      mensagem: `Funcionário cadastrado: ${nome} (${matricula_funcionario})`,
+      matricula_responsavel: matricula_adm
+    })
 
     res.status(201).json({ mensagem: 'Funcionário cadastrado com sucesso', funcionario: data[0] })
   } catch (error) {
@@ -629,12 +673,31 @@ route.post('/cadastrarFuncionario', async (req, res) => {
 })
 
 // editar informacoes do funcionario do setor do adm
-route.put('/editarFuncionario/:matricula_funcionario', async (req, res) => {
+route.put('/editarFuncionario/:matricula_adm', async (req, res) => {
   try {
-    const { matricula_funcionario } = req.params
-    const { email, telefone, cargo, equipe, regiao } = req.body
+    const { matricula_adm } = req.params
+    const { matricula_funcionario, email, telefone, cargo } = req.body
+    // tornar mutáveis equipe e regiao para poder atribuir ids
+    let equipe = req.body.equipe
+    let regiao = req.body.regiao
 
+    const obrigatorios = ['matricula_funcionario']
+    const campoFaltando = validarCampos(obrigatorios, req.body)
 
+    if (campoFaltando) {
+      return res.status(400).json({ mensagem: `Campo obrigatório ausente: ${campoFaltando}` })
+    }
+
+    // verificar setor do adm
+    const { data: adm } = await supabase
+      .from('funcionario')
+      .select('id_setor')
+      .eq('matricula_funcionario', matricula_adm)
+      .maybeSingle()
+
+    if (!adm) {
+      return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
+    }
 
     const { data: funcionarioDesatualizado } = await supabase
       .from('funcionario')
@@ -647,17 +710,77 @@ route.put('/editarFuncionario/:matricula_funcionario', async (req, res) => {
       return res.status(404).json({ mensagem: 'Funcionário não encontrado' })
     }
 
+    // garantir que o funcionário pertence ao setor do ADM
+    if (funcionarioDesatualizado.id_setor !== adm.id_setor) {
+      return res.status(403).json({ mensagem: 'Funcionário não pertence ao setor do ADM' })
+    }
+
+    // verificar e traduzir equipe (nome -> id)
+    if (equipe) {
+      const { data: equipeExistente } = await supabase
+        .from('equipe')
+        .select('id_equipe')
+        .eq('nome_equipe', equipe)
+        .maybeSingle()
+
+      if (!equipeExistente) {
+        return res
+          .status(400)
+          .json({
+            mensagem: 'Equipe não encontrada. Cadastre a equipe antes de vincular ao funcionário.'
+          })
+      }
+      equipe = equipeExistente.id_equipe
+    }
+
+    // verificar e traduzir regiao (nome -> id) / criar se necessário
+    if (regiao) {
+      const { data: regiaoExistente } = await supabase
+        .from('regiao')
+        .select('id_regiao')
+        .eq('nome_regiao', regiao)
+        .maybeSingle()
+
+      if (regiaoExistente) {
+        regiao = regiaoExistente.id_regiao
+      } else {
+        const { data: novaRegiao, error: errorNovaRegiao } = await supabase
+          .from('regiao')
+          .insert([{ nome_regiao: regiao }])
+          .select('id_regiao')
+          .single()
+
+        if (errorNovaRegiao) {
+          return res
+            .status(400)
+            .json({ mensagem: 'Erro ao criar nova regiao', erro: errorNovaRegiao })
+        }
+
+        regiao = novaRegiao.id_regiao
+
+        // notificar criação de região (se criar aqui na edição)
+        await criarNotificacao({
+          tipo_notificacao: 'CADASTRO_REGIAO',
+          mensagem: `Região criada: ${regiao}`,
+          matricula_responsavel: matricula_adm
+        })
+      }
+    }
+
+    // Preparar payload de atualização com colunas corretas (id_equipe / id_regiao)
     const payloadToUpdate = {
       email: email !== undefined ? email : funcionarioDesatualizado.email,
       telefone: telefone !== undefined ? telefone : funcionarioDesatualizado.telefone,
-      cargo: cargo !== undefined ? cargo : funcionarioDesatualizado.cargo
+      cargo: cargo !== undefined ? cargo : funcionarioDesatualizado.cargo,
+      id_equipe: equipe !== undefined ? equipe : funcionarioDesatualizado.id_equipe,
+      id_regiao: regiao !== undefined ? regiao : funcionarioDesatualizado.id_regiao
     }
 
     const { data: funcionarioAtualizado, error } = await supabase
       .from('funcionario')
       .update(payloadToUpdate)
       .eq('matricula_funcionario', matricula_funcionario)
-      .select('email, telefone, cargo')
+      .select('matricula_funcionario, nome, email, telefone, cargo, id_equipe, id_regiao')
       .maybeSingle()
 
     if (error) {
@@ -665,13 +788,19 @@ route.put('/editarFuncionario/:matricula_funcionario', async (req, res) => {
       return res.status(400).json({ mensagem: 'Erro ao atualizar funcionário', erro: error })
     }
 
+    // notificar edição do funcionário
+    await criarNotificacao({
+      matricula_funcionario,
+      tipo_notificacao: 'EDIÇÃO_FUNCIONARIO',
+      mensagem: `Funcionário atualizado: ${funcionarioAtualizado.nome} (${matricula_funcionario})`,
+      matricula_responsavel: matricula_adm
+    })
+
     console.log('Funcionário atualizado com sucesso:', funcionarioAtualizado)
-    return res
-      .status(200)
-      .json({
-        mensagem: 'Funcionário atualizado com sucesso',
-        funcionario: funcionarioAtualizado[0]
-      })
+    return res.status(200).json({
+      mensagem: 'Funcionário atualizado com sucesso',
+      funcionario: funcionarioAtualizado
+    })
   } catch (error) {
     console.error('Erro inesperado:', error)
     return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
@@ -740,7 +869,7 @@ route.post('/cadastrarEscala', async (req, res) => {
       return res.status(400).json({ mensagem: 'Funcionário não encontrado' })
 
     // Inserir escala
-    const { data: escalaCriada } = await supabase
+    const { data: escalaCriada, error: errorEscala } = await supabase
       .from('escala')
       .insert([
         {
@@ -756,11 +885,27 @@ route.post('/cadastrarEscala', async (req, res) => {
       .select()
       .single()
 
+    if (errorEscala) {
+      return res.status(400).json({ mensagem: 'Erro ao inserir escala', erro: errorEscala })
+    }
+
     // Vincular escala ao funcionário
-    await supabase
+    const { error: errorVinculo } = await supabase
       .from('funcionario')
       .update({ id_escala: escalaCriada.id_escala })
       .eq('matricula_funcionario', matricula_funcionario)
+
+    if (errorVinculo) {
+      return res.status(400).json({ mensagem: 'Erro ao vincular escala ao funcionário', erro: errorVinculo })
+    }
+
+    // notificar criação de escala
+    await criarNotificacao({
+      matricula_funcionario,
+      tipo_notificacao: 'CADASTRO_ESCALA',
+      mensagem: `Escala cadastrada para ${matricula_funcionario}: ${tipo_escala} (início ${data_inicio})`,
+      matricula_responsavel: matricula_adm
+    })
 
     return res.status(201).json({ mensagem: 'Escala cadastrada com sucesso', escala: escalaCriada })
   } catch (error) {
@@ -827,7 +972,7 @@ route.put('/alterarEscala', async (req, res) => {
       return res.status(400).json({ mensagem: 'Funcionário não possui escala vinculada' })
 
     // Alterar escala
-    const { data: escalaAtualizada } = await supabase
+    const { data: escalaAtualizada, error } = await supabase
       .from('escala')
       .update({
         data_inicio,
@@ -842,6 +987,18 @@ route.put('/alterarEscala', async (req, res) => {
       .eq('id_escala', funcionarioExistente.id_escala)
       .select()
       .single()
+
+    if (error) {
+      return res.status(400).json({ mensagem: 'Erro ao atualizar escala', erro: error })
+    }
+
+    // notificar alteração de escala
+    await criarNotificacao({
+      matricula_funcionario,
+      tipo_notificacao: 'ALTERACAO_ESCALA',
+      mensagem: `Escala alterada para ${matricula_funcionario}: ${tipo_escala} (início ${data_inicio})`,
+      matricula_responsavel: matricula_adm
+    })
 
     return res
       .status(200)
@@ -930,6 +1087,14 @@ route.post('/cadastrarTurno', async (req, res) => {
         .json({ mensagem: 'Erro ao vincular turno ao funcionário!', erro: errorVinculo })
     }
 
+    // notificar criação de turno
+    await criarNotificacao({
+      matricula_funcionario,
+      tipo_notificacao: 'CADASTRO_TURNO',
+      mensagem: `Turno cadastrado para ${matricula_funcionario}: ${inicio_turno} - ${termino_turno}`,
+      matricula_responsavel: matricula_adm
+    })
+
     res.status(201).json({
       mensagem: 'Turno cadastrado e vinculado com sucesso',
       turno: turnoCriado,
@@ -938,6 +1103,84 @@ route.post('/cadastrarTurno', async (req, res) => {
   } catch (error) {
     return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
   }
+})
+
+route.put('/alterarTurno', async (req, res) => {
+  try {
+    const obrigatorios = [
+      'matricula_adm',
+      'matricula_funcionario',
+      'inicio_turno',
+      'termino_turno',
+      'duracao_turno',
+      'intervalo_turno' 
+
+      ]
+      const campoFaltando = validarCampos(obrigatorios, req.body)
+      if (campoFaltando) {
+        return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
+      }
+
+      const {
+        matricula_adm,
+        matricula_funcionario,
+        inicio_turno,
+        termino_turno,
+        duracao_turno,
+        intervalo_turno
+      } = req.body
+
+      // Verificar se funcionário existe
+      const { data: funcionarioExistente, error: errorFuncionario } = await supabase
+        .from('funcionario')
+        .select('*')
+        .eq('matricula_funcionario', matricula_funcionario)
+        .maybeSingle()
+
+      if (errorFuncionario) {
+        return res
+        .status(400)
+        .json({ mensagem: 'Erro ao buscar funcionário', erro: errorFuncionario })
+      }
+      if (!funcionarioExistente) {
+        return res.status(400).json({ mensagem: 'Matrícula do funcionário não encontrada' })
+      }
+
+      // garantir que o funcionario possua turno antes de alterar
+      if (!funcionarioExistente.id_turno) {
+        return res.status(400).json({
+        mensagem:
+          'Funcionário não possui turno vinculado. Cadastre um turno antes de tentar alterá-lo.'
+        })
+      }
+
+      // Alterar turno
+      const { data: turnoAtualizado, error: errorTurno } = await supabase
+        .from('turno')
+        .update({ inicio_turno, termino_turno, duracao_turno, intervalo_turno })
+        .eq('id_turno', funcionarioExistente.id_turno)
+        .select('*')
+        .single()
+
+      if (errorTurno) {
+        return res.status(400).json({ mensagem: 'Erro ao alterar turno', erro: errorTurno })
+      }
+
+      // notificar alteração de turno
+      await criarNotificacao({
+        matricula_funcionario,
+        tipo_notificacao: 'ALTERACAO_TURNO',
+        mensagem: `Turno alterado para ${matricula_funcionario}: ${inicio_turno} - ${termino_turno}`,
+        matricula_responsavel: matricula_adm
+      })
+
+      res.status(200).json({
+        mensagem: 'Turno alterado com sucesso',
+        turno: turnoAtualizado
+      })
+      } catch (error) {
+      return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+      }
 })
 
 export default route
