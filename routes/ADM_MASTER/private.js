@@ -4,6 +4,9 @@ import supabase from '../../supabase.js'
 
 const route = express.Router()
 
+//contabilizar funcionarios por setor para grafico
+
+
 // Cadastrar Funcionário
 route.post('/cadastrarFuncionario_master', async (req, res) => {
   try {
@@ -125,15 +128,31 @@ route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) =
       setor_id = setorData.id_setor
     }
 
+    //verificar se equipe existe no setor do funcionário e atualizar se necessário
+    const { data: equipeData, error: equipeError } = await supabase
+      .from('equipe')
+      .select('id_equipe')  
+      .eq('nome_equipe', equipe)
+      .eq('id_setor', setor_id)
+      .maybeSingle()
+
+    if (equipeError) {
+      console.log('Erro ao buscar equipe:', equipeError)
+      return res.status(400).json({ mensagem: 'Erro ao buscar equipe', erro: equipeError })
+
+    } else if (equipe && !equipeData) {
+      console.log('Equipe não encontrada no setor:', equipe)
+      return res.status(400).json({ mensagem: 'Equipe não encontrada no setor' })
+    }
+
     const payloadToUpdate = {
       email: email !== undefined ? email : funcionarioDesatualizado.email,
       telefone: telefone !== undefined ? telefone : funcionarioDesatualizado.telefone,
       cargo: cargo !== undefined ? cargo : funcionarioDesatualizado.cargo,
       id_setor: setor_id,
-      status_permissao:
-        status_permissao !== undefined
-          ? status_permissao
-          : funcionarioDesatualizado.status_permissao
+      status_permissao: status_permissao !== undefined ? status_permissao : funcionarioDesatualizado.status_permissao,
+      equipe: equipeData ? equipeData.id_equipe : funcionarioDesatualizado.equipe,
+      regiao: regiao !== undefined ? regiao : funcionarioDesatualizado.regiao
     }
 
     const { data: funcionarioAtualizado, error } = await supabase
