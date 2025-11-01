@@ -517,6 +517,11 @@ route.post('/cadastrarFuncionario', async (req, res) => {
       return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
     }
 
+    //verificar se matricula possui 5 digitos 
+    if (String(req.body.matricula_funcionario).length !== 5) {
+      return res.status(400).json({ mensagem: 'A matrícula deve conter exatamente 5 dígitos' })
+    }
+
     const {
       matricula_adm,
       matricula_funcionario,
