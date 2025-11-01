@@ -5,12 +5,43 @@ import supabase from '../../supabase.js'
 const route = express.Router()
 
 //contabilizar funcionarios por setor para grafico
+route.get('/contabilizarFuncionariosSetor', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('funcionario')
+      .select('setor(nome_setor)')
 
+    if (error) {
+      return res.status(400).json({ mensagem: 'Erro ao contabilizar funcionários por setor', erro: error })
+    }
+
+    const contagemSetores = {}
+
+    data.forEach((funcionario) => {
+      const nomeSetor = funcionario.setor.nome_setor
+      if (contagemSetores[nomeSetor]) {
+        contagemSetores[nomeSetor] += 1
+      } else {
+        contagemSetores[nomeSetor] = 1
+      }
+    })
+
+    res.status(200).json({ contagemSetores })
+  } catch (error) {
+    res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  }
+})
+
+//listar quipes de determinado setor
+route.get('/equipesSetor', async (req, res ) => {
+  
+})
+      
 
 // Cadastrar Funcionário
 route.post('/cadastrarFuncionario_master', async (req, res) => {
   try {
-    const { matricula_funcionario, nome, email, telefone, cargo, setor, status_permissao } =
+    const { matricula_funcionario, nome, email, telefone, cargo, setor, status_permissao, equipe, regiao } =
       req.body
 
     if (
@@ -20,7 +51,9 @@ route.post('/cadastrarFuncionario_master', async (req, res) => {
       !telefone ||
       !cargo ||
       !setor ||
-      !status_permissao
+      !status_permissao ||
+      !equipe ||
+      !regiao
     ) {
       return res.status(400).json({ mensagem: 'Preencha todos os campos obrigatórios' })
     }
@@ -53,6 +86,56 @@ route.post('/cadastrarFuncionario_master', async (req, res) => {
       return res.status(400).json({ mensagem: 'Setor não encontrado', erro: setorError })
     }
 
+    //buscar equipe do setor para associar ao funcionário
+    const { data: equipeData, error: equipeError } = await supabase
+      .from('equipe')
+      .select('id_equipe')
+      .eq('nome_equipe', equipe)
+      .eq('id_setor', setorData.id_setor)
+      .maybeSingle()
+
+    if (equipeError) {
+      return res.status(400).json({ mensagem: 'Erro ao buscar equipe', erro: equipeError })
+    } else if (!equipeData) {
+
+      const { data: novaEquipeData, error: novaEquipeError } = await supabase
+        .from('equipe')
+        .insert([{ nome_equipe: equipe, id_setor: setorData.id_setor }])
+        .select()
+        .maybeSingle()
+
+      if (novaEquipeError) {
+        return res.status(400).json({ mensagem: 'Erro ao criar nova equipe', erro: novaEquipeError })
+      }
+
+      equipeData.id_equipe = novaEquipeData.id_equipe 
+    }
+    
+    //buscar regiao e se nao existir criar outra
+    const { data: regiaoData, error: regiaoError } = await supabase
+      .from('regiao')
+      .select('id_regiao')
+      .eq('nome_regiao', regiao)
+      .maybeSingle()
+
+    if (regiaoError) {
+      return res.status(400).json({ mensagem: 'Erro ao buscar regiao', erro: regiaoError })
+    } else if (!regiaoData) {
+
+      const { data: novaregiaoData, error: novaregiaoError } = await supabase
+        .from('regiao')
+        .insert([{ nome_regiao: regiao}])
+        .select()
+        .maybeSingle()
+
+      if (novaregiaoError) {
+        return res.status(400).json({ mensagem: 'Erro ao criar nova regiao', erro: novaregiaoError })
+      }
+
+      regiaoData.id_regiao = novaregiaoData.id_regiao 
+    }
+
+
     // Inserir funcionário
     const { data, error } = await supabase
       .from('funcionario')
@@ -64,6 +147,8 @@ route.post('/cadastrarFuncionario_master', async (req, res) => {
           senha: senhaHash,
           telefone: telefone,
           cargo: cargo,
+          id_equipe: equipeData.id_equipe,
+          id_regiao: regiaoData.id_regiao,
           id_setor: setorData.id_setor,
           status_permissao: status_permissao
         }
@@ -125,7 +210,7 @@ route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) =
         return res.status(400).json({ mensagem: 'Setor não encontrado', erro: setorError })
       }
 
-      setor_id = setorData.id_setor
+      id_setor = setorData.id_setor
     }
 
     //verificar se equipe existe no setor do funcionário e atualizar se necessário
@@ -133,7 +218,7 @@ route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) =
       .from('equipe')
       .select('id_equipe')  
       .eq('nome_equipe', equipe)
-      .eq('id_setor', setor_id)
+      .eq('id_setor', id_setor)
       .maybeSingle()
 
     if (equipeError) {

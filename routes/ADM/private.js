@@ -645,8 +645,8 @@ route.post('/cadastrarFuncionario', async (req, res) => {
       .insert([
         {
           matricula_funcionario: matricula_funcionario,
-          tipo_notificacao: 'Boas Vindas',
-          mensagem: `Bem vindo ao sistema de gerenciamento de escalas.    Sua matrícula é ${matricula_funcionario}. Por favor, altere sua senha após o primeiro acesso.`,
+          tipo_notificacao: 'BOAS_VINDAS',
+          mensagem: ``,
           lida: false,
           enviada_em: new Date().toISOString()
         }
@@ -662,7 +662,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
     await criarNotificacao({
       matricula_funcionario,
       tipo_notificacao: 'CADASTRO_FUNCIONARIO',
-      mensagem: `Funcionário cadastrado: ${nome} (${matricula_funcionario})`,
+      mensagem: `Bem vindo ao sistema de gerenciamento de escalas! Sua matrícula é ${matricula_funcionario} a mesma é também sua senha inicial. Por favor, altere sua senha após o primeiro acesso.`,
       matricula_responsavel: matricula_adm
     })
 
