@@ -662,7 +662,7 @@ route.post('/cadastrarFuncionario', async (req, res) => {
     await criarNotificacao({
       matricula_funcionario,
       tipo_notificacao: 'CADASTRO_FUNCIONARIO',
-      mensagem: `Bem vindo ao sistema de gerenciamento de escalas! Sua matrícula é ${matricula_funcionario} a mesma é também sua senha inicial. Por favor, altere sua senha após o primeiro acesso.`,
+      mensagem: `Bem vindo ao sistema de gerenciamento de escalas! Sua matrícula é ${matricula_funcionario}, a mesma é também sua senha inicial. Por favor, altere sua senha após o primeiro acesso.`,
       matricula_responsavel: matricula_adm
     })
 
@@ -706,7 +706,6 @@ route.put('/editarFuncionario/:matricula_adm', async (req, res) => {
       .maybeSingle()
 
     if (!funcionarioDesatualizado) {
-      console.log('Funcionário não encontrado.')
       return res.status(404).json({ mensagem: 'Funcionário não encontrado' })
     }
 
@@ -715,22 +714,47 @@ route.put('/editarFuncionario/:matricula_adm', async (req, res) => {
       return res.status(403).json({ mensagem: 'Funcionário não pertence ao setor do ADM' })
     }
 
-    // verificar e traduzir equipe (nome -> id)
-    if (equipe) {
-      const { data: equipeExistente } = await supabase
-        .from('equipe')
-        .select('id_equipe')
-        .eq('nome_equipe', equipe)
-        .maybeSingle()
-
-      if (!equipeExistente) {
-        return res
-          .status(400)
-          .json({
-            mensagem: 'Equipe não encontrada. Cadastre a equipe antes de vincular ao funcionário.'
-          })
+    // --- tratar equipe: aceitar id ou nome (case-insensitive, trim) ---
+    if (equipe !== undefined && equipe !== null && String(equipe).trim() !== '') {
+      console.log('equipe recebida:', equipe)
+      // se vier numeric (ou string numérica) considerar como id
+      const isNumeric = typeof equipe === 'number' || /^\d+$/.test(String(equipe).trim())
+      if (isNumeric) {
+        const id = Number(equipe)
+        const { data: equipeExistente, error: errEquipeById } = await supabase
+          .from('equipe')
+          .select('id_equipe')
+          .eq('id_equipe', id)
+          .maybeSingle()
+        if (errEquipeById) {
+          console.error('Erro Supabase ao buscar equipe por id:', errEquipeById)
+          return res.status(502).json({ mensagem: 'Erro ao comunicar com o banco', erro: errEquipeById })
+        }
+        if (!equipeExistente) {
+          return res
+            .status(400)
+            .json({ mensagem: 'Equipe não encontrada por id. Cadastre a equipe antes de vincular ao funcionário.' })
+        }
+        equipe = equipeExistente.id_equipe
+      } else {
+        // buscar por nome (trim e case-insensitive)
+        const nome = String(equipe).trim()
+        const { data: equipeExistente, error: errEquipeByNome } = await supabase
+          .from('equipe')
+          .select('id_equipe')
+          .ilike('nome_equipe', nome)
+          .maybeSingle()
+        if (errEquipeByNome) {
+          console.error('Erro Supabase ao buscar equipe por nome:', errEquipeByNome)
+          return res.status(502).json({ mensagem: 'Erro ao comunicar com o banco', erro: errEquipeByNome })
+        }
+        if (!equipeExistente) {
+          return res
+            .status(400)
+            .json({ mensagem: 'Equipe não encontrada. Cadastre a equipe antes de vincular ao funcionário.' })
+        }
+        equipe = equipeExistente.id_equipe
       }
-      equipe = equipeExistente.id_equipe
     }
 
     // verificar e traduzir regiao (nome -> id) / criar se necessário
@@ -796,7 +820,6 @@ route.put('/editarFuncionario/:matricula_adm', async (req, res) => {
       matricula_responsavel: matricula_adm
     })
 
-    console.log('Funcionário atualizado com sucesso:', funcionarioAtualizado)
     return res.status(200).json({
       mensagem: 'Funcionário atualizado com sucesso',
       funcionario: funcionarioAtualizado
@@ -1181,6 +1204,61 @@ route.put('/alterarTurno', async (req, res) => {
       } catch (error) {
       return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
       }
+})
+
+// cadastrar equipe
+route.post('/cadastrarEquipe/:matricula_adm', async (req, res) => {
+  try {
+    const { matricula_adm } = req.params
+    const obrigatorios = ['nome_equipe']
+
+    const campoFaltando = validarCampos(obrigatorios, req.body)
+    if (campoFaltando) {
+      return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
+    }
+
+    const { nome_equipe } = req.body
+
+    // Verificar se equipe já existe no setor do adm
+    const { data: adm } = await supabase
+      .from('funcionario')
+      .select('id_setor')
+      .eq('matricula_funcionario', matricula_adm)
+      .maybeSingle()
+
+    if (!adm) {
+      return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
+    }
+
+    const { data: equipeExistente, error: errorEquipeExistente } = await supabase
+      .from('equipe')
+      .select('*')
+      .eq('nome_equipe', nome_equipe)
+      .eq('id_setor', adm.id_setor)
+      .maybeSingle()
+
+    if (errorEquipeExistente) {
+      return res.status(400).json({ mensagem: 'Erro ao buscar equipe', erro: errorEquipeExistente })
+    }
+    if (equipeExistente) {
+      return res.status(400).json({ mensagem: 'Equipe já existe neste setor' })
+    }
+
+    // Inserir equipe
+    const { data: novaEquipe, error: errorNovaEquipe } = await supabase
+      .from('equipe')
+      .insert([{ nome_equipe, id_setor: adm.id_setor }])
+      .select('*')
+      .single()
+
+    if (errorNovaEquipe) {
+      return res.status(400).json({ mensagem: 'Erro ao inserir equipe', erro: errorNovaEquipe })
+    }
+
+    res.status(201).json({ mensagem: 'Equipe cadastrada com sucesso', equipe: novaEquipe })
+  } catch (error) {
+    return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  }
 })
 
 export default route
