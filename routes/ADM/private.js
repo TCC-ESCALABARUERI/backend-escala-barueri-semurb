@@ -144,31 +144,18 @@ route.get('/equipesSetor/:matricula_adm', async (req, res) => {
       return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
     }
 
-    // buscar equipes que possuem funcionários no setor
+    // buscar equipes diretamente na tabela equipe (retorna todas as equipes do setor)
     const { data: equipes, error } = await supabase
-      .from('funcionario')
-      .select('id_equipe, equipe:equipe(nome_equipe)')
+      .from('equipe')
+      .select('id_equipe, nome_equipe')
       .eq('id_setor', adm.id_setor)
-      .not('id_equipe', 'is', null)
+      .order('nome_equipe', { ascending: true })
 
     if (error) {
       return res.status(400).json({ mensagem: 'Erro ao buscar equipes', erro: error })
     }
 
-    // Remover duplicatas e formatar resultado
-    const equipesUnicas = []
-    const nomesVistos = new Set()
-    for (const f of equipes) {
-      if (f.equipe && f.equipe.nome_equipe && !nomesVistos.has(f.equipe.nome_equipe)) {
-        equipesUnicas.push({
-          id_equipe: f.id_equipe,
-          nome_equipe: f.equipe.nome_equipe
-        })
-        nomesVistos.add(f.equipe.nome_equipe)
-      }
-    }
-
-    res.status(200).json(equipesUnicas)
+    res.status(200).json(equipes || [])
   } catch (error) {
     return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
   }
