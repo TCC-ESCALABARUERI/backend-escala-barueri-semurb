@@ -36,9 +36,19 @@ route.get('/contabilizarFuncionariosSetor', async (req, res) => {
   }
 })
 
-//listar quipes de determinado setor
-route.get('/equipesSetor', async (req, res ) => {
-  
+//listar quipes 
+route.get('/listarEquipes_master', async (req, res ) => {
+  try {
+    const { data, error } = await supabase.from('equipe').select('*')
+    
+    if (error) {
+      return res.status(400).json({ mensagem: 'Erro ao listar equipes', erro: error })
+    }
+
+    res.status(200).json({ equipes: data })
+  } catch (error) {
+    res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  }   
 })
       
 
@@ -512,6 +522,19 @@ route.put('/alterarEscala_master', async (req, res) => {
   }
 })
 
+route.get('/listarEscalas_master', async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('escala').select('*')
+    
+    if (error) {
+      return res.status(400).json({ mensagem: 'Erro ao listar escalas', erro: error })
+    } 
+    res.status(200).json({ escalas: data })
+  } catch (error) {
+    res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  }
+})
+
 // turno
 // cadastrar turno e vincular ao funcionário
 route.post('/cadastrarTurno_master', async (req, res) => {
@@ -607,7 +630,7 @@ route.post('/cadastrarTurno_master', async (req, res) => {
   }
 })
 
-route.put('/alterarTurno', async (req, res) => {
+route.put('/alterarTurno_master', async (req, res) => {
   try {
     const obrigatorios = [
       'matricula_funcionario',
@@ -682,6 +705,18 @@ route.put('/alterarTurno', async (req, res) => {
       }
 })
 
+route.get('/listarTurnos_master', async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('turno').select('*')
+    
+    if (error) {
+      return res.status(400).json({ mensagem: 'Erro ao listar turnos', erro: error })
+    } 
+    res.status(200).json({ turnos: data })
+  } catch (error) {
+    res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  }
+})
 
 //Setores
 
@@ -775,6 +810,7 @@ route.delete('/deletarSetor/:id', async (req, res) => {
   }
 })
 
+// adicionar feriados
 
 
 export default route
