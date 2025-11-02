@@ -4,6 +4,41 @@ import supabase from '../../supabase.js'
 
 const route = express.Router()
 
+// Função para validar campos obrigatórios
+function validarCampos(campos, body) {
+  for (const campo of campos) {
+    if (!body[campo]) return campo
+  }
+  return null
+}
+
+
+async function criarNotificacao({
+  matricula_funcionario = null,
+  tipo_notificacao = 'GENÉRICA',
+  mensagem = '',
+  matricula_responsavel = null
+}) {
+  try {
+    const { error } = await supabase.from('notificacoes').insert([
+      {
+        matricula_funcionario,
+        tipo_notificacao,
+        mensagem,
+        matricula_responsavel,
+        lida: false,
+        enviada_em: new Date().toISOString()
+      }
+    ])
+    if (error) {
+      // não interrompe a operação principal, apenas loga
+      console.error('Erro ao criar notificação:', error)
+    }
+  } catch (err) {
+    console.error('Erro inesperado ao criar notificação:', err)
+  }
+}
+
 //contabilizar funcionarios por setor para grafico
 route.get('/contabilizarFuncionariosSetor', async (req, res) => {
   try {
