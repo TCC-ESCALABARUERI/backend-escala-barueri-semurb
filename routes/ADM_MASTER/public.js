@@ -23,7 +23,7 @@ route.post('/loginMaster', async (req, res) => {
     }
 
     // gerar token JWT para autenticação
-    const token = jwt.sign({ registration }, process.env.JWT_SECRET, { expiresIn: '1h' })
+    const token = jwt.sign({ registration }, process.env.JWT_SECRET, { expiresIn: '12h' })
 
     res.status(200).json({ message: 'Login bem-sucedido', token })
   } catch (error) {

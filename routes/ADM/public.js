@@ -45,7 +45,7 @@ route.post('/loginAdm', async (req, res) => {
     const token = jwt.sign(
       { matricula_funcionario: funcionario.matricula_funcionario },
       process.env.JWT_SECRET,
-      { expiresIn: '8h' }
+      { expiresIn: '12h' }
     )
 
     // retornar escala do funcionario

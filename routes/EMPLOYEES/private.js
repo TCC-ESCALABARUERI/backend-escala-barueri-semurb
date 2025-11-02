@@ -4,6 +4,14 @@ import bcrypt from 'bcrypt'
 
 const route = express.Router()
 
+// Função para validar campos obrigatórios
+function validarCampos(campos, body) {
+  for (const campo of campos) {
+    if (!body[campo]) return campo
+  }
+  return null
+}
+
 // confirmação de leitura da escala
 route.put('/confirmacaoEscala/:matricula_funcionario', async (req, res) => {
   const { matricula_funcionario } = req.params
@@ -94,6 +102,41 @@ route.put('/alterarSenha', async (req, res) => {
     res.status(200).json({ message: 'Senha alterada com sucesso.', funcionario: data[0] })
   } catch (error) {
     res.status(500).json({ message: 'Erro ao alterar senha.', error: error.message })
+  }
+})
+
+// editar informacoes
+route.put('/editarInformacoes/:matricula_funcionario', async (req, res) => {
+  try {
+    const { matricula_funcionario } = req.params
+    const camposObrigatorios = ['email', 'telefone']
+
+    const campoFaltando = validarCampos(camposObrigatorios, req.body)
+    if (campoFaltando) {
+      return res
+        .status(400)
+        .json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
+    }
+
+    const { email, telefone } = req.body
+
+    const { data, error } = await supabase
+      .from('funcionario')
+      .update({ email, telefone })
+      .eq('matricula_funcionario', matricula_funcionario)
+      .select('matricula_funcionario, nome, email, telefone')
+
+    if (error) {
+      throw error
+    }
+    
+    if (!data || data.length === 0) {
+      return res.status(404).json({ message: 'Funcionário não encontrado.' })
+    }
+
+    res.status(200).json({ message: 'Informações atualizadas com sucesso.', funcionario: data[0] })
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao atualizar informações.', error: error.message })
   }
 })
 

@@ -32,7 +32,7 @@ route.post('/loginFuncionario', async (req, res) => {
     const token = jwt.sign(
       { matricula_funcionario: funcionario.matricula_funcionario },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '12h' }
     )
 
     // Busca informações relacionadas em paralelo
