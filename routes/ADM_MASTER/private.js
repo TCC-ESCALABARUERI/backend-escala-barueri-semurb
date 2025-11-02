@@ -811,6 +811,77 @@ route.delete('/deletarSetor/:id', async (req, res) => {
 })
 
 // adicionar feriados
+route.post('/adicionarFeriados_master', async (req, res) => {
+  try {
+    const feriados = req.body // pode ser um objeto ou array
 
+    if (!feriados || feriados.length === 0) {
+      return res.status(400).json({ mensagem: 'Envie pelo menos um feriado' })
+    }
+
+    const lista = Array.isArray(feriados) ? feriados : [feriados]
+
+    const invalidos = lista.filter(
+      f => !f.dia_feriado || !f.nome_feriado
+    )
+    if (invalidos.length > 0) {
+      return res
+        .status(400)
+        .json({ mensagem: 'Todos os feriados devem conter dia_feriado e nome_feriado' })
+    }
+
+    const { data, error } = await supabase
+      .from('feriado')
+      .insert(lista)
+      .select()
+
+    if (error) {
+      return res
+        .status(400)
+        .json({ mensagem: 'Erro ao adicionar feriados', erro: error })
+    }
+
+    res.status(201).json({
+      mensagem: 'Feriados adicionados com sucesso',
+      feriados: data
+    })
+  } catch (error) {
+    res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  }
+})
+
+
+// Listar Feriados
+
+route.get('/listarFeriados_master', async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('feriado').select('*')
+    
+    if (error) {
+      return res.status(400).json({ mensagem: 'Erro ao listar feriados', erro: error })
+    } 
+    res.status(200).json({ feriados: data })
+  } catch (error) {
+    res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  }
+})
+
+// Deletar Feriado
+
+route.delete('/deletarFeriado_master/:id_feriado', async (req, res) => {
+  try {
+    const { id_feriado } = req.params
+
+    const { error } = await supabase.from('feriado').delete().eq('id_feriado', id_feriado)
+
+    if (error) {
+      return res.status(400).json({ mensagem: 'Erro ao deletar feriado', erro: error })
+    }
+
+    res.status(200).json({ mensagem: 'Feriado deletado com sucesso' })
+  } catch (error) {
+    res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  }
+})
 
 export default route
