@@ -85,6 +85,21 @@ route.get('/listarEquipes_master', async (req, res ) => {
     res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
   }   
 })
+
+// listar regioes
+route.get('/listarRegioes_master', async (req, res ) => { 
+  try{
+    const { data, error } = await supabase.from('regiao').select('*')
+
+    if (error) {
+      return res.status(400).json({ mensagem: 'Erro ao listar regiões', erro: error })
+    }
+
+    res.status(200).json({ regioes: data })
+  } catch (error) {
+    res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  }
+})
       
 
 // Cadastrar Funcionário
