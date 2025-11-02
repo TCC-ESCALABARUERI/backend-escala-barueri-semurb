@@ -7,28 +7,32 @@ const route = express.Router()
 //contabilizar funcionarios por setor para grafico
 route.get('/contabilizarFuncionariosSetor', async (req, res) => {
   try {
+    // buscar todos os funcionários trazendo id_setor e relacionamento setor.nome_setor
     const { data, error } = await supabase
       .from('funcionario')
-      .select('setor(nome_setor)')
+      .select('id_setor, setor(nome_setor)')
 
     if (error) {
-      return res.status(400).json({ mensagem: 'Erro ao contabilizar funcionários por setor', erro: error })
+      return res.status(400).json({ mensagem: 'Erro ao buscar funcionários', erro: error })
     }
 
-    const contagemSetores = {}
+    // agregar contagem por setor (funcionários sem setor aparecem como "Sem setor" com id_setor = null)
+    const mapa = new Map()
+    for (const f of data || []) {
+      const id = f.id_setor ?? null
+      const nome = f.setor?.nome_setor ?? 'Sem setor'
+      const key = id === null ? 'null' : String(id)
 
-    data.forEach((funcionario) => {
-      const nomeSetor = funcionario.setor.nome_setor
-      if (contagemSetores[nomeSetor]) {
-        contagemSetores[nomeSetor] += 1
-      } else {
-        contagemSetores[nomeSetor] = 1
+      if (!mapa.has(key)) {
+        mapa.set(key, { id_setor: id, nome_setor: nome, quantidade: 0 })
       }
-    })
+      mapa.get(key).quantidade += 1
+    }
 
-    res.status(200).json({ contagemSetores })
+    const contagem = Array.from(mapa.values())
+    return res.status(200).json(contagem)
   } catch (error) {
-    res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+    return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
   }
 })
 
