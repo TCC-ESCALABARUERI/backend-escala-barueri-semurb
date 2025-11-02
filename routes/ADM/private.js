@@ -887,6 +887,11 @@ route.post('/cadastrarEscala', async (req, res) => {
     if (!funcionarioExistente)
       return res.status(400).json({ mensagem: 'Funcionário não encontrado' })
 
+    // verificar se funcionario ja possui escala
+    if (funcionarioExistente.id_escala) {
+      return res.status(400).json({ mensagem: 'Funcionário já possui uma escala vinculada' })
+    }
+
     // Inserir escala
     const { data: escalaCriada, error: errorEscala } = await supabase
       .from('escala')
@@ -930,7 +935,7 @@ route.post('/cadastrarEscala', async (req, res) => {
 
     // confirmacao
 
-    await supabase
+    const { data: confirmacaoCriada, error: errorConfirmacao } = await supabase
       .from('escala_confirmacao')
       .insert([
         {
@@ -941,13 +946,22 @@ route.post('/cadastrarEscala', async (req, res) => {
       .select('*')
       .single()
 
-    // vincular id confirmacao da escala em questão ao funcionario
+    if (errorConfirmacao) {
+      console.error('Erro ao criar confirmação da escala:', errorConfirmacao)
+      // opcional: desfazer escala criada ou retornar erro
+      return res.status(400).json({ mensagem: 'Erro ao criar confirmação da escala', erro: errorConfirmacao })
+    }
 
-    await supabase
+    // Vincular o id da confirmação (id_confirmacao) ao funcionário
+    const { error: errorVinculoConfirm } = await supabase
       .from('funcionario')
-      .update({ id_confirmacao: escalaCriada.id_escala })
+      .update({ id_confirmacao: confirmacaoCriada.id_confirmacao })
       .eq('matricula_funcionario', funcionarioExistente.matricula_funcionario)
-      .select()
+
+    if (errorVinculoConfirm) {
+      console.error('Erro ao vincular confirmação ao funcionário:', errorVinculoConfirm)
+      // não interromper necessariamente, mas informar
+    }
 
     return res.status(201).json({ mensagem: 'Escala cadastrada com sucesso', escala: escalaCriada })
   } catch (error) {
@@ -1042,31 +1056,45 @@ route.put('/alterarEscala', async (req, res) => {
 
     // confirmacao
 
-    await supabase
+    // remover confirmação antiga (se existir) associada à escala anterior do funcionário
+    if (funcionarioExistente.id_escala) {
+      const { error: errorDeletar } = await supabase
+        .from('escala_confirmacao')
+        .delete()
+        .eq('id_escala', funcionarioExistente.id_escala)
+        .eq('matricula_funcionario', funcionarioExistente.matricula_funcionario)
+
+      if (errorDeletar) {
+        console.error('Erro ao deletar confirmação antiga:', errorDeletar)
+      }
+    }
+
+    // criar nova confirmação para a escala atualizada
+    const { data: confirmacaoCriada, error: errorConfirmacao } = await supabase
       .from('escala_confirmacao')
       .insert([
         {
           matricula_funcionario: funcionarioExistente.matricula_funcionario,
-          id_escala: escalaCriada.id_escala
+          id_escala: escalaAtualizada.id_escala
         }
       ])
       .select('*')
       .single()
 
-    // vincular id confirmacao da escala em questão ao funcionario
+    if (errorConfirmacao) {
+      console.error('Erro ao criar confirmação da escala atualizada:', errorConfirmacao)
+      return res.status(400).json({ mensagem: 'Erro ao criar confirmação da escala', erro: errorConfirmacao })
+    }
 
-    await supabase
+    // atualizar o funcionário para apontar para a nova confirmação (usar id_confirmacao retornado)
+    const { error: errorAtualizarFunc } = await supabase
       .from('funcionario')
-      .update({ id_confirmacao: escalaCriada.id_escala })
+      .update({ id_confirmacao: confirmacaoCriada.id_confirmacao })
       .eq('matricula_funcionario', funcionarioExistente.matricula_funcionario)
-      .select()
 
-      //deletar confirmação antiga
-    await supabase
-      .from('escala_confirmacao')
-      .delete()
-      .eq('id_escala', funcionarioExistente.id_escala)
-      .eq('matricula_funcionario', funcionarioExistente.matricula_funcionario)
+    if (errorAtualizarFunc) {
+      console.error('Erro ao atualizar funcionário com nova confirmação:', errorAtualizarFunc)
+    }
 
     return res
       .status(200)
