@@ -16,71 +16,64 @@ function validarCampos(campos, body) {
 // login de Funcionário
 route.post('/loginAdm', async (req, res) => {
   try {
+    const obrigatorios = ['matricula_funcionario', 'senha']
+    const campoFaltando = validarCampos(obrigatorios, req.body)
+    if (campoFaltando)
+      return res.status(400).json({ mensagem: `Campo obrigatório ausente: ${campoFaltando}` })
+
     const { matricula_funcionario, senha } = req.body
-    if (!matricula_funcionario || !senha) {
-      return res.status(400).json({ mensagem: 'matricula e senha são obrigatórios' })
+
+    const { data: funcionario, error } = await supabase
+      .from('funcionario')
+      .select('*')
+      .eq('matricula_funcionario', matricula_funcionario)
+      .maybeSingle()
+
+    if (error) return res.status(400).json({ mensagem: 'Erro ao buscar usuário', erro: error })
+    if (!funcionario) return res.status(404).json({ mensagem: 'Usuário não encontrado' })
+
+    const senhaValida = await bcrypt.compare(senha, funcionario.senha)
+    if (!senhaValida) return res.status(401).json({ mensagem: 'Credenciais Inválidas' })
+
+    // verificar se existe a permissao de adm
+    if (funcionario.status_permissao !== 'Sim') {
+      return res
+        .status(403)
+        .json({ mensagem: 'Acesso negado: Permissão de administrador necessária' })
     }
 
-    // checar variáveis de ambiente essenciais antes da chamada
-    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
-      console.error('Supabase ENV ausente:', {
-        SUPABASE_URL: !!process.env.SUPABASE_URL,
-        SUPABASE_KEY: !!process.env.SUPABASE_KEY
-      })
-      return res.status(502).json({ mensagem: 'Configuração do Supabase ausente. Verifique SUPABASE_URL e SUPABASE_KEY.' })
-    }
+    const token = jwt.sign(
+      { matricula_funcionario: funcionario.matricula_funcionario },
+      process.env.JWT_SECRET,
+      { expiresIn: '12h' }
+    )
 
-    // realizar busca do usuário no Supabase com tratamento de falha de fetch
-    let funcionario
-    try {
-      const { data, error } = await supabase
-        .from('funcionario')
-        .select('*')
-        .eq('matricula_funcionario', matricula_funcionario)
-        .maybeSingle()
+    // retornar escala do funcionario
+    const { data: escala } = await supabase
+      .from('escala')
+      .select('*')
+      .eq('id_escala', funcionario.id_escala)
+      .maybeSingle()
 
-      if (error) {
-        console.error('Erro Supabase ao buscar usuário:', error)
-        return res.status(502).json({ mensagem: 'Erro ao buscar usuário no banco', erro: error })
-      }
+    // retornar setor do funcionario
+    const { data: setor } = await supabase
+      .from('setor')
+      .select('*')
+      .eq('id_setor', funcionario.id_setor)
+      .maybeSingle()
 
-      funcionario = data
-    } catch (err) {
-      console.error('Fetch para Supabase falhou ao buscar usuário:', err)
-      return res.status(502).json({
-        mensagem: 'Falha de conexão com Supabase (fetch failed). Verifique rede/variáveis de ambiente.',
-        erro: { message: err.message }
-      })
-    }
+      const {data: notificacoes} = await supabase
+                .from('notificacoes')
+                .select('*')
+                .eq('matricula_funcionario', funcionario.matricula_funcionario)
+                .order('enviada_em', { ascending: false })
 
-    if (!funcionario) {
-      return res.status(401).json({ mensagem: 'Credenciais inválidas' })
-    }
 
-    // validar senha (implemente verificação real aqui)
-    // if (!validsenha(senha, funcionario.senha_hash)) return res.status(401).json({ mensagem: 'Credenciais inválidas' })
 
-    // buscar notificações separadamente (não usar relacionamento no mesmo select)
-    let notificacoes = []
-    try {
-      const { data: nots, error: errN } = await supabase
-        .from('notificacoes')
-        .select('*')
-        .or(`matricula_funcionario.eq.${matricula_funcionario}`)
-        .order('enviada_em', { ascending: false })
-
-      if (errN) {
-        console.error('Erro ao buscar notificações:', errN)
-      } else {
-        notificacoes = nots || []
-      }
-    } catch (err) {
-      console.error('Fetch para Supabase falhou ao buscar notificações:', err)
-    }
-
-    return res.status(200).json({ funcionario, notificacoes })
+    return res
+      .status(200)
+      .json({ mensagem: 'Login bem-sucedido', funcionario, token, escala, setor, notificacoes })
   } catch (error) {
-    console.error('Erro inesperado em loginAdm:', error)
     return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
   }
 })
