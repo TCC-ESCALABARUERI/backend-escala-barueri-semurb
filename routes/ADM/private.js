@@ -38,6 +38,79 @@ async function criarNotificacao({
   }
 }
 
+// rota para gerar notificacao de um relatorio de quantos funcionarios aina faltam confirmar a escala no setor do adm ( a cada tempo determinado )
+route.post('/notificarFaltamConfirmar/:matricula_adm', async (req, res) => {
+  try {
+    const { matricula_adm } = req.params
+    if (!matricula_adm) {
+      return res.status(400).json({ mensagem: 'Matrícula do ADM é obrigatória' })
+    }
+    // buscar setor do adm
+    const { data: adm, error: errorAdm } = await supabase
+      .from('funcionario')
+      .select('id_setor')
+      .eq('matricula_funcionario', matricula_adm)
+      .maybeSingle()
+    if (errorAdm) {
+      return res.status(400).json({ mensagem: 'Erro ao buscar ADM', erro: errorAdm })
+    }
+    if (!adm) {
+      return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
+    }
+
+    // buscar funcionarios do setor que possuem escala
+    const { data: funcionarios, error } = await supabase
+      .from('funcionario')
+      .select(
+        `matricula_funcionario,
+            nome,
+            escala_confirmacao:escala_confirmacao!escala_confirmacao_matricula_funcionario_fkey(
+                id_confirmacao,
+                id_escala,
+                data_confirmacao,
+                status
+            ),
+            escala(id_escala, data_inicio, tipo_escala)
+        ` )
+      .eq('id_setor', adm.id_setor)
+      .not('id_escala', 'is', null)
+    if (error) {
+      return res.status(400).json({ mensagem: 'Erro ao buscar funcionários', erro: error })
+    }
+
+    // filtrar funcionarios que nao possuem confirmacao de escala
+    const faltamConfirmar = (funcionarios || []).filter(
+      f => !f.escala_confirmacao || (Array.isArray(f.escala_confirmacao) && f.escala_confirmacao.length === 0)
+    )
+
+    const quantidadeFaltam = faltamConfirmar.length
+
+    // preparar lista de nomes/matrículas para retorno
+    const listaNaoConfirmaram = faltamConfirmar.map(f => ({
+      matricula: f.matricula_funcionario,
+      nome: f.nome || 'Nome não informado'
+    }))
+
+    // criar notificacao para o adm (texto breve)
+    const mensagemNotificacao = `Existem ${quantidadeFaltam} funcionário(s) que ainda não confirmaram sua escala.`
+
+    await criarNotificacao({
+      matricula_funcionario: matricula_adm ,
+      tipo_notificacao: 'FALTAM_CONFIRMAR_ESCALA',
+      mensagem: mensagemNotificacao
+    })
+
+    // retornar quantidade e lista com nomes/matrículas
+    res.status(200).json({
+      mensagem: 'Notificação criada com sucesso',
+      quantidade_faltam: quantidadeFaltam,
+      faltam_confirmar: listaNaoConfirmaram
+    })
+  } catch (error) {
+    return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
+  }
+})
+
 //contabilizar funcionarios por equipe
 route.get('/funcionariosEquipe/:id_equipe', async (req, res) => {
   try {

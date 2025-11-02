@@ -62,6 +62,13 @@ route.post('/loginAdm', async (req, res) => {
       .eq('id_setor', funcionario.id_setor)
       .maybeSingle()
 
+      //retornar notificacoes do adm
+      const { data: notificacoes } = await supabase
+      .from('notificacoes')
+      .select('*')
+      .eq('matricula_funcionario', funcionario.matricula_funcionario)
+      .order('data_criacao', { ascending: false })
+
     return res
       .status(200)
       .json({ mensagem: 'Login bem-sucedido', funcionario, token, escala, setor })
