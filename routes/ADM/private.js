@@ -666,130 +666,97 @@ route.put('/editarFuncionario/:matricula_adm', async (req, res) => {
   try {
     const { matricula_adm } = req.params
     const { matricula_funcionario, email, telefone, cargo } = req.body
-    // tornar mutáveis equipe e regiao para poder atribuir ids
     let equipe = req.body.equipe
     let regiao = req.body.regiao
 
     const obrigatorios = ['matricula_funcionario']
     const campoFaltando = validarCampos(obrigatorios, req.body)
+    if (campoFaltando) return res.status(400).json({ mensagem: `Campo obrigatório ausente: ${campoFaltando}` })
 
-    if (campoFaltando) {
-      return res.status(400).json({ mensagem: `Campo obrigatório ausente: ${campoFaltando}` })
-    }
-
-    // verificar setor do adm
-    const { data: adm } = await supabase
+    // buscar setor do ADM
+    const { data: adm, error: errAdm } = await supabase
       .from('funcionario')
       .select('id_setor')
       .eq('matricula_funcionario', matricula_adm)
       .maybeSingle()
+    if (errAdm) return res.status(400).json({ mensagem: 'Erro ao buscar ADM', erro: errAdm })
+    if (!adm) return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
 
-    if (!adm) {
-      return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
-    }
-
-    const { data: funcionarioDesatualizado } = await supabase
+    // buscar funcionário
+    const { data: funcionarioDesatualizado, error: errFunc } = await supabase
       .from('funcionario')
       .select('*')
       .eq('matricula_funcionario', matricula_funcionario)
       .maybeSingle()
+    if (errFunc) return res.status(400).json({ mensagem: 'Erro ao buscar funcionário', erro: errFunc })
+    if (!funcionarioDesatualizado) return res.status(404).json({ mensagem: 'Funcionário não encontrado' })
 
-    if (!funcionarioDesatualizado) {
-      return res.status(404).json({ mensagem: 'Funcionário não encontrado' })
-    }
-
-    // garantir que o funcionário pertence ao setor do ADM
+    // verificar setor do adm
     if (funcionarioDesatualizado.id_setor !== adm.id_setor) {
       return res.status(403).json({ mensagem: 'Funcionário não pertence ao setor do ADM' })
     }
 
-    // --- tratar equipe: aceitar id ou nome (case-insensitive, trim) ---
+    const isNumeric = (v) => typeof v === 'number' || (/^\d+$/.test(String(v).trim()))
+
+    // --- tratar equipe: aceitar id ou nome; buscar lista limitada e pegar primeiro elemento ---
     if (equipe !== undefined && equipe !== null && String(equipe).trim() !== '') {
-      console.log('equipe recebida:', equipe)
-      // se vier numeric (ou string numérica) considerar como id
-      const isNumeric = typeof equipe === 'number' || /^\d+$/.test(String(equipe).trim())
-      if (isNumeric) {
+      if (isNumeric(equipe)) {
         const id = Number(equipe)
-        const { data: equipeExistente, error: errEquipeById } = await supabase
+        const { data: eqById, error: errEqById } = await supabase
           .from('equipe')
           .select('id_equipe')
           .eq('id_equipe', id)
           .maybeSingle()
-        if (errEquipeById) {
-          console.error('Erro Supabase ao buscar equipe por id:', errEquipeById)
-          return res
-            .status(502)
-            .json({ mensagem: 'Erro ao comunicar com o banco', erro: errEquipeById })
+        if (errEqById) return res.status(502).json({ mensagem: 'Erro ao buscar equipe por id', erro: errEqById })
+        if (!eqById) {
+          return res.status(400).json({ mensagem: 'Equipe não encontrada por id. Cadastre a equipe antes de vincular ao funcionário.' })
         }
-        if (!equipeExistente) {
-          return res
-            .status(400)
-            .json({
-              mensagem:
-                'Equipe não encontrada por id. Cadastre a equipe antes de vincular ao funcionário.'
-            })
-        }
-        equipe = equipeExistente.id_equipe
+        equipe = eqById.id_equipe
       } else {
-        // buscar por nome (trim e case-insensitive)
+        // busca por nome -> retorna array limitado a 1 para evitar PGRST116
         const nome = String(equipe).trim()
-        const { data: equipeExistente, error: errEquipeByNome } = await supabase
+        const { data: lista, error: errLista } = await supabase
           .from('equipe')
-          .select('id_equipe')
+          .select('id_equipe, nome_equipe')
           .ilike('nome_equipe', nome)
-          .maybeSingle()
-        if (errEquipeByNome) {
-          console.error('Erro Supabase ao buscar equipe por nome:', errEquipeByNome)
-          return res
-            .status(502)
-            .json({ mensagem: 'Erro ao comunicar com o banco', erro: errEquipeByNome })
+          .limit(1)
+
+        if (errLista) return res.status(502).json({ mensagem: 'Erro ao buscar equipe por nome', erro: errLista })
+        if (!lista || lista.length === 0) {
+          return res.status(400).json({ mensagem: 'Equipe não encontrada. Cadastre a equipe antes de vincular ao funcionário.' })
         }
-        if (!equipeExistente) {
-          return res
-            .status(400)
-            .json({
-              mensagem: 'Equipe não encontrada. Cadastre a equipe antes de vincular ao funcionário.'
-            })
-        }
-        equipe = equipeExistente.id_equipe
+        equipe = lista[0].id_equipe
       }
     }
 
-    // verificar e traduzir regiao (nome -> id) / criar se necessário
-    if (regiao) {
-      const { data: regiaoExistente } = await supabase
-        .from('regiao')
-        .select('id_regiao')
-        .eq('nome_regiao', regiao)
-        .maybeSingle()
-
-      if (regiaoExistente) {
-        regiao = regiaoExistente.id_regiao
+    // --- tratar regiao: aceitar id ou nome; buscar lista limitada e pegar primeiro elemento / criar se necessário ---
+    if (regiao !== undefined && regiao !== null && String(regiao).trim() !== '') {
+      if (isNumeric(regiao)) {
+        regiao = Number(regiao)
       } else {
-        const { data: novaRegiao, error: errorNovaRegiao } = await supabase
+        const nomeR = String(regiao).trim()
+        const { data: listaRg, error: errRg } = await supabase
           .from('regiao')
-          .insert([{ nome_regiao: regiao }])
-          .select('id_regiao')
-          .single()
+          .select('id_regiao, nome_regiao')
+          .ilike('nome_regiao', nomeR)
+          .limit(1)
 
-        if (errorNovaRegiao) {
-          return res
-            .status(400)
-            .json({ mensagem: 'Erro ao criar nova regiao', erro: errorNovaRegiao })
+        if (errRg) return res.status(502).json({ mensagem: 'Erro ao buscar regiao por nome', erro: errRg })
+
+        if (listaRg && listaRg.length > 0) {
+          regiao = listaRg[0].id_regiao
+        } else {
+          const { data: novaReg, error: errCriar } = await supabase
+            .from('regiao')
+            .insert([{ nome_regiao: nomeR }])
+            .select('id_regiao')
+            .single()
+          if (errCriar) return res.status(400).json({ mensagem: 'Erro ao criar regiao', erro: errCriar })
+          regiao = novaReg.id_regiao
         }
-
-        regiao = novaRegiao.id_regiao
-
-        // notificar criação de região (se criar aqui na edição)
-        await criarNotificacao({
-          tipo_notificacao: 'CADASTRO_REGIAO',
-          mensagem: `Região criada: ${regiao}`,
-          matricula_responsavel: matricula_adm
-        })
       }
     }
 
-    // Preparar payload de atualização com colunas corretas (id_equipe / id_regiao)
     const payloadToUpdate = {
       email: email !== undefined ? email : funcionarioDesatualizado.email,
       telefone: telefone !== undefined ? telefone : funcionarioDesatualizado.telefone,
@@ -798,23 +765,22 @@ route.put('/editarFuncionario/:matricula_adm', async (req, res) => {
       id_regiao: regiao !== undefined ? regiao : funcionarioDesatualizado.id_regiao
     }
 
-    const { data: funcionarioAtualizado, error } = await supabase
+    const { data: funcionarioAtualizado, error: errUpdate } = await supabase
       .from('funcionario')
       .update(payloadToUpdate)
       .eq('matricula_funcionario', matricula_funcionario)
       .select('matricula_funcionario, nome, email, telefone, cargo, id_equipe, id_regiao')
       .maybeSingle()
 
-    if (error) {
-      console.log('Erro ao atualizar funcionário:', error)
-      return res.status(400).json({ mensagem: 'Erro ao atualizar funcionário', erro: error })
+    if (errUpdate) {
+      console.error('Erro ao atualizar funcionário:', errUpdate)
+      return res.status(400).json({ mensagem: 'Erro ao atualizar funcionário', erro: errUpdate })
     }
 
-    // notificar edição do funcionário
     await criarNotificacao({
       matricula_funcionario,
       tipo_notificacao: 'EDIÇÃO_FUNCIONARIO',
-      mensagem: `Funcionário atualizado: ${funcionarioAtualizado.nome} (${matricula_funcionario})`,
+      mensagem: `Funcionário atualizado: ${funcionarioAtualizado?.nome ?? matricula_funcionario}`,
       matricula_responsavel: matricula_adm
     })
 

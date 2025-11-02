@@ -293,7 +293,7 @@ route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) =
       return res.status(404).json({ mensagem: 'Funcionário não encontrado' })
     }
 
-    let setor_id = funcionarioDesatualizado.id_setor
+    let id_setor = funcionarioDesatualizado.id_setor
     if (setor) {
       const { data: setorData, error: setorError } = await supabase
         .from('setor')
@@ -325,17 +325,36 @@ route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) =
       return res.status(400).json({ mensagem: 'Equipe não encontrada no setor' })
     }
 
+    // verificar regiao e atualizar se necessário
+    let id_regiao = funcionarioDesatualizado.id_regiao
+    if (regiao) {
+      const { data: regiaoData, error: regiaoError } = await supabase
+        .from('regiao')
+        .select('id_regiao')
+        .eq('nome_regiao', regiao)
+        .maybeSingle()
+
+      if (regiaoError) {
+        console.log('Erro ao buscar regiao:', regiaoError)
+        return res.status(400).json({ mensagem: 'Erro ao buscar regiao', erro: regiaoError })
+      } else if (!regiaoData) {
+        console.log('Regiao não encontrada:', regiao)
+        return res.status(400).json({ mensagem: 'Regiao não encontrada' })
+      }
+      id_regiao = regiaoData.id_regiao
+    }
+
     const payloadToUpdate = {
       email: email !== undefined ? email : funcionarioDesatualizado.email,
       telefone: telefone !== undefined ? telefone : funcionarioDesatualizado.telefone,
       cargo: cargo !== undefined ? cargo : funcionarioDesatualizado.cargo,
-      id_setor: setor_id,
+      id_setor: id_setor,
       status_permissao:
         status_permissao !== undefined
           ? status_permissao
           : funcionarioDesatualizado.status_permissao,
-      equipe: equipeData ? equipeData.id_equipe : funcionarioDesatualizado.equipe,
-      regiao: regiao !== undefined ? regiao : funcionarioDesatualizado.regiao
+      id_equipe: equipeData ? equipeData.id_equipe : funcionarioDesatualizado.equipe,
+      id_regiao: id_regiao
     }
 
     const { data: funcionarioAtualizado, error } = await supabase
@@ -350,35 +369,6 @@ route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) =
       return res.status(400).json({ mensagem: 'Erro ao atualizar funcionário', erro: error })
     }
 
-    // confirmacao
-
-    await supabase
-      .from('escala_confirmacao')
-      .insert([
-        {
-          matricula_funcionario: funcionarioExistente.matricula_funcionario,
-          id_escala: escalaCriada.id_escala
-        }
-      ])
-      .select('*')
-      .single()
-
-    // vincular id confirmacao da escala em questão ao funcionario
-
-    await supabase
-      .from('funcionario')
-      .update({ id_confirmacao: escalaCriada.id_escala })
-      .eq('matricula_funcionario', funcionarioExistente.matricula_funcionario)
-      .select()
-
-    //deletar confirmação antiga
-    await supabase
-      .from('escala_confirmacao')
-      .delete()
-      .eq('id_escala', funcionarioExistente.id_escala)
-      .eq('matricula_funcionario', funcionarioExistente.matricula_funcionario)
-
-    console.log('Funcionário atualizado com sucesso:', funcionarioAtualizado)
     return res.status(200).json({
       mensagem: 'Funcionário atualizado com sucesso',
       funcionario: funcionarioAtualizado[0]
