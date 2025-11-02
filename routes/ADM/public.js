@@ -16,9 +16,9 @@ function validarCampos(campos, body) {
 // login de Funcionário
 route.post('/loginAdm', async (req, res) => {
   try {
-    const { matricula, password } = req.body
-    if (!matricula || !password) {
-      return res.status(400).json({ mensagem: 'matricula e password são obrigatórios' })
+    const { matricula_funcionario, senha } = req.body
+    if (!matricula_funcionario || !senha) {
+      return res.status(400).json({ mensagem: 'matricula e senha são obrigatórios' })
     }
 
     // checar variáveis de ambiente essenciais antes da chamada
@@ -36,7 +36,7 @@ route.post('/loginAdm', async (req, res) => {
       const { data, error } = await supabase
         .from('funcionario')
         .select('*')
-        .eq('matricula_funcionario', matricula)
+        .eq('matricula_funcionario', matricula_funcionario)
         .maybeSingle()
 
       if (error) {
@@ -58,7 +58,7 @@ route.post('/loginAdm', async (req, res) => {
     }
 
     // validar senha (implemente verificação real aqui)
-    // if (!validPassword(password, funcionario.senha_hash)) return res.status(401).json({ mensagem: 'Credenciais inválidas' })
+    // if (!validsenha(senha, funcionario.senha_hash)) return res.status(401).json({ mensagem: 'Credenciais inválidas' })
 
     // buscar notificações separadamente (não usar relacionamento no mesmo select)
     let notificacoes = []
@@ -66,7 +66,7 @@ route.post('/loginAdm', async (req, res) => {
       const { data: nots, error: errN } = await supabase
         .from('notificacoes')
         .select('*')
-        .or(`matricula_funcionario.eq.${matricula}`)
+        .or(`matricula_funcionario.eq.${matricula_funcionario}`)
         .order('enviada_em', { ascending: false })
 
       if (errN) {
