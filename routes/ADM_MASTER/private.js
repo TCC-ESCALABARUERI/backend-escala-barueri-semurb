@@ -234,27 +234,6 @@ route.post('/cadastrarFuncionario_master', async (req, res) => {
       return res.status(400).json({ mensagem: 'Erro ao inserir dados', erro: error })
     }
 
-    // confirmacao
-
-    await supabase
-      .from('escala_confirmacao')
-      .insert([
-        {
-          matricula_funcionario: funcionarioExistente.matricula_funcionario,
-          id_escala: escalaCriada.id_escala
-        }
-      ])
-      .select('*')
-      .single()
-
-    // vincular id confirmacao da escala em questão ao funcionario
-
-    await supabase
-      .from('funcionario')
-      .update({ id_confirmacao: escalaCriada.id_escala })
-      .eq('matricula_funcionario', funcionarioExistente.matricula_funcionario)
-      .select()
-
     res.status(201).json({ mensagem: 'Funcionário cadastrado com sucesso', funcionario: data[0] })
   } catch (error) {
     return res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
