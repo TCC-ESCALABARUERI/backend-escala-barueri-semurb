@@ -521,8 +521,8 @@ route.post('/cadastrarEscala_master', async (req, res) => {
     // notificar criação de escala
     await criarNotificacao({
       matricula_funcionario,
-      tipo_notificacao: 'CADASTRO_ESCALA',
-      mensagem: `Escala cadastrada para ${matricula_funcionario}: ${tipo_escala} (início ${data_inicio})`
+      tipo_notificacao: 'Nova Escala',
+      mensagem: `Sua nova escala foi cadastrada: Início em ${data_inicio}, Tipo: ${tipo_escala}. Por favor, confirme o recebimento da escala no sistema.`,
     })
 
     // confirmacao
@@ -640,8 +640,8 @@ route.put('/alterarEscala_master', async (req, res) => {
     // notificar alteração de escala
     await criarNotificacao({
       matricula_funcionario,
-      tipo_notificacao: 'ALTERACAO_ESCALA',
-      mensagem: `Escala alterada para ${matricula_funcionario}: ${tipo_escala} (início ${data_inicio})`
+      tipo_notificacao: 'Atualização de Escala',
+      mensagem: `Sua escala foi atualizada: Início em ${data_inicio}, Tipo: ${tipo_escala}. Por favor, confirme o recebimento da escala no sistema.`,
     })
 
     // confirmacao
@@ -783,8 +783,8 @@ route.post('/cadastrarTurno_master', async (req, res) => {
     // notificar criação de turno
     await criarNotificacao({
       matricula_funcionario,
-      tipo_notificacao: 'CADASTRO_TURNO',
-      mensagem: `Turno cadastrado para ${matricula_funcionario}: ${inicio_turno} - ${termino_turno}`
+      tipo_notificacao: 'Novo Turno',
+      mensagem: `Seu novo turno foi cadastrado: ${inicio_turno} - ${termino_turno}.`,
     })
 
     res.status(201).json({
@@ -853,8 +853,8 @@ route.put('/alterarTurno_master', async (req, res) => {
     // notificar alteração de turno
     await criarNotificacao({
       matricula_funcionario,
-      tipo_notificacao: 'ALTERACAO_TURNO',
-      mensagem: `Turno alterado para ${matricula_funcionario}: ${inicio_turno} - ${termino_turno}`
+      tipo_notificacao: 'Atualização de Turno',
+      mensagem: `Seu turno foi atualizado: ${inicio_turno} - ${termino_turno}.`,
     })
 
     res.status(200).json({

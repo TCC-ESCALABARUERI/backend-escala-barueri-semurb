@@ -96,7 +96,7 @@ route.post('/notificarFaltamConfirmar/:matricula_adm', async (req, res) => {
 
     await criarNotificacao({
       matricula_funcionario: matricula_adm ,
-      tipo_notificacao: 'FALTAM_CONFIRMAR_ESCALA',
+      tipo_notificacao: 'Pendencias',
       mensagem: mensagemNotificacao
     })
 
@@ -652,13 +652,6 @@ route.post('/cadastrarFuncionario', async (req, res) => {
       }
 
       regiaoId = novaRegiao.id_regiao
-
-      // notificar criação de região
-      await criarNotificacao({
-        tipo_notificacao: 'CADASTRO_REGIAO',
-        mensagem: `Região criada: ${nome_regiao}`,
-        matricula_responsavel: matricula_adm
-      })
     }
 
     // Verificar se matrícula já existe
@@ -701,29 +694,10 @@ route.post('/cadastrarFuncionario', async (req, res) => {
       return res.status(400).json({ mensagem: 'Erro ao inserir dados', erro: error })
     }
 
-    // gerar primeira notificação (Boas Vindas)
-    const { data: notificacao, error: errorNotificacao } = await supabase
-      .from('notificacoes')
-      .insert([
-        {
-          matricula_funcionario: matricula_funcionario,
-          tipo_notificacao: 'BOAS_VINDAS',
-          mensagem: ``,
-          lida: false,
-          enviada_em: new Date().toISOString()
-        }
-      ])
-      .select()
-      .single()
-
-    if (errorNotificacao) {
-      console.error('Erro ao criar notificação de boas-vindas:', errorNotificacao)
-    }
-
     // notificar cadastro de funcionário (registro geral)
     await criarNotificacao({
       matricula_funcionario,
-      tipo_notificacao: 'CADASTRO_FUNCIONARIO',
+      tipo_notificacao: 'Boas Vindas',
       mensagem: `Bem vindo ao sistema de gerenciamento de escalas! Sua matrícula é ${matricula_funcionario}, a mesma é também sua senha inicial. Por favor, altere sua senha após o primeiro acesso.`,
       matricula_responsavel: matricula_adm
     })
@@ -852,8 +826,8 @@ route.put('/editarFuncionario/:matricula_adm', async (req, res) => {
 
     await criarNotificacao({
       matricula_funcionario,
-      tipo_notificacao: 'EDIÇÃO_FUNCIONARIO',
-      mensagem: `Funcionário atualizado: ${funcionarioAtualizado?.nome ?? matricula_funcionario}`,
+      tipo_notificacao: 'Atualização de Dados',
+      mensagem: `Seus dados foram atualizados pelo ADM. Verifique as informações no sistema.`,
       matricula_responsavel: matricula_adm
     })
 
@@ -967,8 +941,8 @@ route.post('/cadastrarEscala', async (req, res) => {
     // notificar criação de escala
     await criarNotificacao({
       matricula_funcionario,
-      tipo_notificacao: 'CADASTRO_ESCALA',
-      mensagem: `Escala cadastrada para ${matricula_funcionario}: ${tipo_escala} (início ${data_inicio})`,
+      tipo_notificacao: 'Nova Escala',
+      mensagem: `Sua nova escala foi cadastrada: Início em ${data_inicio}, Tipo: ${tipo_escala}. Por favor, confirme o recebimento da escala no sistema.`,
       matricula_responsavel: matricula_adm
     })
 
@@ -1088,8 +1062,8 @@ route.put('/alterarEscala', async (req, res) => {
     // notificar alteração de escala
     await criarNotificacao({
       matricula_funcionario,
-      tipo_notificacao: 'ALTERACAO_ESCALA',
-      mensagem: `Escala alterada para ${matricula_funcionario}: ${tipo_escala} (início ${data_inicio})`,
+      tipo_notificacao: 'Atualização de Escala',
+      mensagem: `Sua escala foi atualizada: Início em ${data_inicio}, Tipo: ${tipo_escala}. Por favor, confirme o recebimento da escala no sistema.`,
       matricula_responsavel: matricula_adm
     })
 
@@ -1225,8 +1199,8 @@ route.post('/cadastrarTurno', async (req, res) => {
     // notificar criação de turno
     await criarNotificacao({
       matricula_funcionario,
-      tipo_notificacao: 'CADASTRO_TURNO',
-      mensagem: `Turno cadastrado para ${matricula_funcionario}: ${inicio_turno} - ${termino_turno}`,
+      tipo_notificacao: 'Novo Turno',
+      mensagem: `Seu novo turno foi cadastrado: ${inicio_turno} - ${termino_turno}. Por favor, confirme o recebimento do turno no sistema.`,
       matricula_responsavel: matricula_adm
     })
 
@@ -1303,8 +1277,8 @@ route.put('/alterarTurno', async (req, res) => {
     // notificar alteração de turno
     await criarNotificacao({
       matricula_funcionario,
-      tipo_notificacao: 'ALTERACAO_TURNO',
-      mensagem: `Turno alterado para ${matricula_funcionario}: ${inicio_turno} - ${termino_turno}`,
+      tipo_notificacao: 'Atualização de Turno',
+      mensagem: `Seu turno foi atualizado: ${inicio_turno} - ${termino_turno}. Por favor, confirme o recebimento do turno no sistema.`,
       matricula_responsavel: matricula_adm
     })
 
