@@ -888,7 +888,10 @@ route.post('/cadastrarSetor', async (req, res) => {
 
     //criar equipe padrao de adm no setor
     await supabase.from('equipe').insert([{ nome_equipe: `${nome_setor}(ADM)`, id_setor: data[0].id_setor }])
-    
+
+    if (error) {
+      return res.status(400).json({ mensagem: 'Erro ao criar equipe padrão do setor', erro: error })
+    }
 
     res.status(201).json({ mensagem: 'Setor cadastrado com sucesso', setor: data[0] })
   } catch (error) {

@@ -860,36 +860,63 @@ route.post('/cadastrarEscala', async (req, res) => {
     } = req.body
 
     // Interpretar escala tipo NxM
-    const padrao = /^(\d{1,2})x(\d{1,2})$/
-    const match = tipo_escala.match(padrao)
-    if (!match) return res.status(400).json({ mensagem: 'Tipo de escala inválido' })
-    let n = parseInt(match[1], 10),
-      m = parseInt(match[2], 10)
-    if (n + m > 7) {
-      n = Math.ceil(n / 24)
-      m = Math.ceil(m / 24)
-    }
+const padrao = /^(\d{1,2})x(\d{1,2})$/
+const match = tipo_escala.match(padrao)
+if (!match)
+  return res.status(400).json({ mensagem: 'Tipo de escala inválido' })
 
-    // Verifica se precisa de dias específicos
-    const precisa_dias_especificos = usa_dias_especificos === 'SIM'
+let n = parseInt(match[1], 10)
+let m = parseInt(match[2], 10)
 
-    if (precisa_dias_especificos) {
-      const diasArray = Array.isArray(dias_n_trabalhados_escala_semanal)
-        ? dias_n_trabalhados_escala_semanal
-        : []
-      if (diasArray.length === 0)
-        return res.status(400).json({ mensagem: 'Informe os dias específicos de folga.' })
+// Corrige tratamento de escalas em horas (como 12x36, 24x48, etc.)
+//
+// Nova lógica:
+// - Se n ou m forem maiores que 7, assume-se que estão em horas.
+// - Converte N e M de horas para dias de maneira mais realista.
+//   Exemplo: 12x36 -> 12h trabalho + 36h folga = ciclo de 48h (~2 dias)
+//   => trabalha 0,5 dia / folga 1,5 dia, arredondando: 1x1
+if (n > 7 || m > 7) {
+  const totalHoras = n + m
+  const proporcaoTrabalho = n / totalHoras
+  const proporcaoFolga = m / totalHoras
+  const totalDias = totalHoras / 24
+  n = Math.max(1, Math.round(totalDias * proporcaoTrabalho))
+  m = Math.max(1, Math.round(totalDias * proporcaoFolga))
+}
 
-      const diasValidos = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
-      const diasInvalidos = diasArray.filter(d => !diasValidos.includes(d))
-      if (diasInvalidos.length > 0)
-        return res.status(400).json({ mensagem: `Dias inválidos: ${diasInvalidos.join(', ')}` })
+// Verifica se precisa de dias específicos
+const precisa_dias_especificos = usa_dias_especificos === 'SIM'
 
-      if (diasArray.length !== m)
-        return res.status(400).json({
-          mensagem: `Quantidade de dias não trabalhados (${m}) difere de dias informados (${diasArray.length}).`
-        })
-    }
+if (precisa_dias_especificos) {
+  const diasArray = Array.isArray(dias_n_trabalhados_escala_semanal)
+    ? dias_n_trabalhados_escala_semanal
+    : []
+
+  if (diasArray.length === 0)
+    return res.status(400).json({ mensagem: 'Informe os dias específicos de folga.' })
+
+  // Agora aceita nomes completos e abreviações (Domingo/Dom, Segunda/Seg etc.)
+  const diasValidos = [
+    'Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado',
+    'Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'
+  ]
+
+  const diasInvalidos = diasArray.filter(d => !diasValidos.includes(d))
+  if (diasInvalidos.length > 0)
+    return res.status(400).json({ mensagem: `Dias inválidos: ${diasInvalidos.join(', ')}` })
+
+  // Normaliza abreviações (opcional, caso queira padronizar)
+  const mapDias = {
+    Dom: 'Domingo', Seg: 'Segunda', Ter: 'Terça', Qua: 'Quarta',
+    Qui: 'Quinta', Sex: 'Sexta', Sab: 'Sábado'
+  }
+  const diasNormalizados = diasArray.map(d => mapDias[d] || d)
+
+  if (diasNormalizados.length !== m)
+    return res.status(400).json({
+      mensagem: `Quantidade de dias não trabalhados (${m}) difere dos dias informados (${diasNormalizados.length}).`
+    })
+}
 
     // Verificar funcionário
     const { data: funcionarioExistente } = await supabase
@@ -999,33 +1026,65 @@ route.put('/alterarEscala', async (req, res) => {
       usa_dias_especificos
     } = req.body
 
-    const padrao = /^(\d{1,2})x(\d{1,2})$/
-    const match = tipo_escala.match(padrao)
-    if (!match) return res.status(400).json({ mensagem: 'Tipo de escala inválido' })
-    let n = parseInt(match[1], 10),
-      m = parseInt(match[2], 10)
-    if (n + m > 7) {
-      n = Math.ceil(n / 24)
-      m = Math.ceil(m / 24)
-    }
+    // Interpretar escala tipo NxM
+const padrao = /^(\d{1,2})x(\d{1,2})$/
+const match = tipo_escala.match(padrao)
+if (!match)
+  return res.status(400).json({ mensagem: 'Tipo de escala inválido' })
 
-    const precisa_dias_especificos = usa_dias_especificos === 'SIM'
-    let diasArray = []
-    if (precisa_dias_especificos) {
-      diasArray = Array.isArray(dias_n_trabalhados_escala_semanal)
-        ? dias_n_trabalhados_escala_semanal
-        : []
-      if (diasArray.length === 0)
-        return res.status(400).json({ mensagem: 'Informe os dias específicos de folga.' })
-      const diasValidos = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
-      const diasInvalidos = diasArray.filter(d => !diasValidos.includes(d))
-      if (diasInvalidos.length > 0)
-        return res.status(400).json({ mensagem: `Dias inválidos: ${diasInvalidos.join(', ')}` })
-      if (diasArray.length !== m)
-        return res.status(400).json({
-          mensagem: `Quantidade de dias não trabalhados (${m}) difere de dias informados (${diasArray.length}).`
-        })
-    }
+let n = parseInt(match[1], 10)
+let m = parseInt(match[2], 10)
+
+// Corrige tratamento de escalas em horas (como 12x36, 24x48, etc.)
+//
+// Nova lógica:
+// - Se n ou m forem maiores que 7, assume-se que estão em horas.
+// - Converte N e M de horas para dias de maneira mais realista.
+//   Exemplo: 12x36 -> 12h trabalho + 36h folga = ciclo de 48h (~2 dias)
+//   => trabalha 0,5 dia / folga 1,5 dia, arredondando: 1x1
+if (n > 7 || m > 7) {
+  const totalHoras = n + m
+  const proporcaoTrabalho = n / totalHoras
+  const proporcaoFolga = m / totalHoras
+  const totalDias = totalHoras / 24
+  n = Math.max(1, Math.round(totalDias * proporcaoTrabalho))
+  m = Math.max(1, Math.round(totalDias * proporcaoFolga))
+}
+
+// Verifica se precisa de dias específicos
+const precisa_dias_especificos = usa_dias_especificos === 'SIM'
+
+if (precisa_dias_especificos) {
+  const diasArray = Array.isArray(dias_n_trabalhados_escala_semanal)
+    ? dias_n_trabalhados_escala_semanal
+    : []
+
+  if (diasArray.length === 0)
+    return res.status(400).json({ mensagem: 'Informe os dias específicos de folga.' })
+
+  // Agora aceita nomes completos e abreviações (Domingo/Dom, Segunda/Seg etc.)
+  const diasValidos = [
+    'Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado',
+    'Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'
+  ]
+
+  const diasInvalidos = diasArray.filter(d => !diasValidos.includes(d))
+  if (diasInvalidos.length > 0)
+    return res.status(400).json({ mensagem: `Dias inválidos: ${diasInvalidos.join(', ')}` })
+
+  // Normaliza abreviações (opcional, caso queira padronizar)
+  const mapDias = {
+    Dom: 'Domingo', Seg: 'Segunda', Ter: 'Terça', Qua: 'Quarta',
+    Qui: 'Quinta', Sex: 'Sexta', Sab: 'Sábado'
+  }
+  const diasNormalizados = diasArray.map(d => mapDias[d] || d)
+
+  if (diasNormalizados.length !== m)
+    return res.status(400).json({
+      mensagem: `Quantidade de dias não trabalhados (${m}) difere dos dias informados (${diasNormalizados.length}).`
+    })
+}
+
 
     // Verificar funcionário e setor
     const { data: funcionarioExistente } = await supabase
