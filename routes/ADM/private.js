@@ -859,7 +859,7 @@ route.post('/cadastrarEscala', async (req, res) => {
       usa_dias_especificos
     } = req.body
 
-    // Interpretar escala tipo NxM
+// Interpretar escala tipo NxM
 const padrao = /^(\d{1,2})x(\d{1,2})$/
 const match = tipo_escala.match(padrao)
 if (!match)
@@ -868,20 +868,27 @@ if (!match)
 let n = parseInt(match[1], 10)
 let m = parseInt(match[2], 10)
 
-// Corrige tratamento de escalas em horas (como 12x36, 24x48, etc.)
+// Corrige tratamento de escalas em horas (ex: 12x36, 24x48, etc.)
 //
-// Nova lógica:
-// - Se n ou m forem maiores que 7, assume-se que estão em horas.
-// - Converte N e M de horas para dias de maneira mais realista.
-//   Exemplo: 12x36 -> 12h trabalho + 36h folga = ciclo de 48h (~2 dias)
-//   => trabalha 0,5 dia / folga 1,5 dia, arredondando: 1x1
+// Lógica:
+// - Se N ou M > 7 → assume-se que são horas.
+// - A cada ciclo (N + M horas), calcula-se quantos dias o ciclo representa.
+// - A partir disso, define-se 1 dia trabalhado para escalas de até 24h trabalhadas.
+// - E calcula 1 dia de folga se a folga for >= 24h.
 if (n > 7 || m > 7) {
-  const totalHoras = n + m
-  const proporcaoTrabalho = n / totalHoras
-  const proporcaoFolga = m / totalHoras
-  const totalDias = totalHoras / 24
-  n = Math.max(1, Math.round(totalDias * proporcaoTrabalho))
-  m = Math.max(1, Math.round(totalDias * proporcaoFolga))
+  const cicloHoras = n + m
+  const cicloDias = cicloHoras / 24
+
+  // Se for uma escala horária curta (12x36, 24x48, etc.)
+  // consideramos 1 dia trabalhado e 1 dia de folga por ciclo
+  if (cicloDias <= 3) {
+    n = 1
+    m = 1
+  } else {
+    // Escalas mais longas (ex: 24x72 → 1x3)
+    n = 1
+    m = Math.round((m / n))
+  }
 }
 
 // Verifica se precisa de dias específicos
@@ -895,7 +902,7 @@ if (precisa_dias_especificos) {
   if (diasArray.length === 0)
     return res.status(400).json({ mensagem: 'Informe os dias específicos de folga.' })
 
-  // Agora aceita nomes completos e abreviações (Domingo/Dom, Segunda/Seg etc.)
+  // Agora aceita nomes completos e abreviações
   const diasValidos = [
     'Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado',
     'Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'
@@ -905,7 +912,7 @@ if (precisa_dias_especificos) {
   if (diasInvalidos.length > 0)
     return res.status(400).json({ mensagem: `Dias inválidos: ${diasInvalidos.join(', ')}` })
 
-  // Normaliza abreviações (opcional, caso queira padronizar)
+  // Normaliza abreviações (opcional)
   const mapDias = {
     Dom: 'Domingo', Seg: 'Segunda', Ter: 'Terça', Qua: 'Quarta',
     Qui: 'Quinta', Sex: 'Sexta', Sab: 'Sábado'
@@ -917,6 +924,7 @@ if (precisa_dias_especificos) {
       mensagem: `Quantidade de dias não trabalhados (${m}) difere dos dias informados (${diasNormalizados.length}).`
     })
 }
+
 
     // Verificar funcionário
     const { data: funcionarioExistente } = await supabase
@@ -1035,20 +1043,27 @@ if (!match)
 let n = parseInt(match[1], 10)
 let m = parseInt(match[2], 10)
 
-// Corrige tratamento de escalas em horas (como 12x36, 24x48, etc.)
+// Corrige tratamento de escalas em horas (ex: 12x36, 24x48, etc.)
 //
-// Nova lógica:
-// - Se n ou m forem maiores que 7, assume-se que estão em horas.
-// - Converte N e M de horas para dias de maneira mais realista.
-//   Exemplo: 12x36 -> 12h trabalho + 36h folga = ciclo de 48h (~2 dias)
-//   => trabalha 0,5 dia / folga 1,5 dia, arredondando: 1x1
+// Lógica:
+// - Se N ou M > 7 → assume-se que são horas.
+// - A cada ciclo (N + M horas), calcula-se quantos dias o ciclo representa.
+// - A partir disso, define-se 1 dia trabalhado para escalas de até 24h trabalhadas.
+// - E calcula 1 dia de folga se a folga for >= 24h.
 if (n > 7 || m > 7) {
-  const totalHoras = n + m
-  const proporcaoTrabalho = n / totalHoras
-  const proporcaoFolga = m / totalHoras
-  const totalDias = totalHoras / 24
-  n = Math.max(1, Math.round(totalDias * proporcaoTrabalho))
-  m = Math.max(1, Math.round(totalDias * proporcaoFolga))
+  const cicloHoras = n + m
+  const cicloDias = cicloHoras / 24
+
+  // Se for uma escala horária curta (12x36, 24x48, etc.)
+  // consideramos 1 dia trabalhado e 1 dia de folga por ciclo
+  if (cicloDias <= 3) {
+    n = 1
+    m = 1
+  } else {
+    // Escalas mais longas (ex: 24x72 → 1x3)
+    n = 1
+    m = Math.round((m / n))
+  }
 }
 
 // Verifica se precisa de dias específicos
@@ -1062,7 +1077,7 @@ if (precisa_dias_especificos) {
   if (diasArray.length === 0)
     return res.status(400).json({ mensagem: 'Informe os dias específicos de folga.' })
 
-  // Agora aceita nomes completos e abreviações (Domingo/Dom, Segunda/Seg etc.)
+  // Agora aceita nomes completos e abreviações
   const diasValidos = [
     'Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado',
     'Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'
@@ -1072,7 +1087,7 @@ if (precisa_dias_especificos) {
   if (diasInvalidos.length > 0)
     return res.status(400).json({ mensagem: `Dias inválidos: ${diasInvalidos.join(', ')}` })
 
-  // Normaliza abreviações (opcional, caso queira padronizar)
+  // Normaliza abreviações (opcional)
   const mapDias = {
     Dom: 'Domingo', Seg: 'Segunda', Ter: 'Terça', Qua: 'Quarta',
     Qui: 'Quinta', Sex: 'Sexta', Sab: 'Sábado'
