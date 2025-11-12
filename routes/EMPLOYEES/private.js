@@ -140,14 +140,12 @@ route.put('/editarInformacoes/:matricula_funcionario', async (req, res) => {
   }
 })
 
-route.get('/diasEspecificos/:matricula_funcionario', async (req, res) => {
+route.get('/diasEspecificos', async (req, res) => {
   try {
-    const { matricula_funcionario } = req.params
 
     const { data: diasEspecificos, error } = await supabase
       .from('dias_especificos')
       .select('*')
-      .eq('matricula_funcionario', matricula_funcionario)
 
     if (error) {
       return res.status(400).json({
