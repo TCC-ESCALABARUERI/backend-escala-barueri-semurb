@@ -140,4 +140,33 @@ route.put('/editarInformacoes/:matricula_funcionario', async (req, res) => {
   }
 })
 
+route.get('/diasEspecificos/:matricula_funcionario', async (req, res) => {
+  try {
+    const { matricula_funcionario } = req.params
+
+    const { data: diasEspecificos, error } = await supabase
+      .from('dias_especificos')
+      .select('*')
+      .eq('matricula_funcionario', matricula_funcionario)
+
+    if (error) {
+      return res.status(400).json({
+        mensagem: 'Erro ao listar dias específicos do funcionário',
+        erro: error.message
+      })
+    }
+
+    return res.status(200).json({
+      mensagem: 'Listagem bem-sucedida',
+      diasEspecificos
+    })
+
+  } catch (err) {
+    return res.status(500).json({
+      mensagem: 'Erro no servidor',
+      erro: err.message
+    })
+  }
+})
+
 export default route

@@ -1420,4 +1420,80 @@ route.post('/cadastrarEquipe/:matricula_adm', async (req, res) => {
   }
 })
 
+route.post('/cadastrarDiaEspecifico/:matricula_adm', async (req, res) => {
+  try {
+    const { matricula_adm } = req.params
+
+    const obrigatorios = ['matricula_funcionario', 'nome_diae', 'data_diae', 'descricao_diae']
+    const campoFaltando = validarCampos(obrigatorios, req.body)
+
+    if (campoFaltando) {
+      return res.status(400).json({
+        mensagem: `Preencha o campo obrigatório: ${campoFaltando}`
+      })
+    }
+
+    const { matricula_funcionario, nome_diae, data_diae, descricao_diae } = req.body
+
+    // verifica se já existe um dia específico cadastrado na mesma data para o mesmo funcionário
+    const { data: diaExistente, error: errorCheck } = await supabase
+      .from('dias_especificos')
+      .select('*')
+      .eq('matricula_funcionario', matricula_funcionario)
+      .eq('data_diae', data_diae)
+      .maybeSingle()
+
+    if (errorCheck) {
+      return res.status(400).json({
+        mensagem: 'Erro ao verificar existência de dia específico',
+        erro: errorCheck.message
+      })
+    }
+
+    if (diaExistente) {
+      return res.status(409).json({
+        mensagem: 'Já existe um dia específico cadastrado para este funcionário nesta data'
+      })
+    }
+
+    // insere o novo dia específico
+    const { data: diaEspecifico, error } = await supabase
+      .from('dias_especificos')
+      .insert([{
+        matricula_funcionario,
+        nome_diae,
+        data_diae,
+        descricao_diae
+      }])
+      .select('*')
+      .single()
+
+    if (error) {
+      return res.status(400).json({
+        mensagem: 'Erro ao inserir dia específico',
+        erro: error.message
+      })
+    }
+
+    // notificar funcionário sobre o novo dia específico
+    await criarNotificacao({
+      matricula_funcionario,
+      tipo_notificacao: 'Novo Dia Específico',
+      mensagem: `Um novo dia específico foi adicionado: ${nome_diae} (${data_diae}). Verifique os detalhes no sistema.`,
+      matricula_responsavel: matricula_adm
+    })
+
+    return res.status(201).json({
+      mensagem: 'Dia específico criado com sucesso e notificação enviada',
+      diaEspecifico
+    })
+
+  } catch (err) {
+    return res.status(500).json({
+      mensagem: 'Erro no servidor',
+      erro: err.message
+    })
+  }
+})
+
 export default route
