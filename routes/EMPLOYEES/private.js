@@ -1,6 +1,25 @@
 import express from 'express'
 import supabase from '../../supabase.js'
 import bcrypt from 'bcrypt'
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { get } from 'http';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/');
+    },
+    filename: function (req, file, cb) {
+        cb(null, file.originalname);
+    }
+});
+
+const upload = multer({ storage });
 
 const route = express.Router()
 
@@ -113,9 +132,7 @@ route.put('/editarInformacoes/:matricula_funcionario', async (req, res) => {
 
     const campoFaltando = validarCampos(camposObrigatorios, req.body)
     if (campoFaltando) {
-      return res
-        .status(400)
-        .json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
+      return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
     }
 
     const { email, telefone } = req.body
@@ -129,7 +146,7 @@ route.put('/editarInformacoes/:matricula_funcionario', async (req, res) => {
     if (error) {
       throw error
     }
-    
+
     if (!data || data.length === 0) {
       return res.status(404).json({ message: 'Funcionário não encontrado.' })
     }
@@ -142,10 +159,7 @@ route.put('/editarInformacoes/:matricula_funcionario', async (req, res) => {
 
 route.get('/diasEspecificos', async (req, res) => {
   try {
-
-    const { data: diasEspecificos, error } = await supabase
-      .from('dias_especificos')
-      .select('*')
+    const { data: diasEspecificos, error } = await supabase.from('dias_especificos').select('*')
 
     if (error) {
       return res.status(400).json({
@@ -158,6 +172,200 @@ route.get('/diasEspecificos', async (req, res) => {
       mensagem: 'Listagem bem-sucedida',
       diasEspecificos
     })
+  } catch (err) {
+    return res.status(500).json({
+      mensagem: 'Erro no servidor',
+      erro: err.message
+    })
+  }
+})
+
+// adicionar imagem de perfil
+route.post(
+  '/uploadImagemPerfil/:matricula_funcionario',
+  upload.single('file'),
+  async (req, res) => {
+    try {
+      const { matricula_funcionario } = req.params
+
+      console.log("Upload recebido para matrícula:", matricula_funcionario)
+      console.log("Arquivo recebido:", req.file?.originalname)
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'Nenhum arquivo enviado.' })
+      }
+
+      const filePath = path.join(process.cwd(), 'uploads', req.file.filename)
+
+      // Verificar se o funcionário existe
+      const { data: funcionario, error: funcionarioError } = await supabase
+        .from('funcionario')
+        .select('*')
+        .eq('matricula_funcionario', matricula_funcionario)
+        .single()
+
+      if (funcionarioError) {
+        console.log("Erro ao consultar funcionário:", funcionarioError)
+        return res.status(500).json({
+          error: 'Erro na consulta do funcionário.',
+          detalhes: funcionarioError,
+        })
+      }
+
+      if (!funcionario) {
+        console.log("Funcionário não encontrado.");
+        return res.status(404).json({ error: 'Funcionário não encontrado.' })
+      }
+
+      //verificar se o funcionario ja tem uma imagem cadastrada
+      const { data: imagemExistente, error: imagemError } = await supabase
+        .from('imagem_perfil')
+        .select('*')
+        .eq('matricula_funcionario', matricula_funcionario)
+        .single()
+
+      if (imagemError) {
+        console.log("Erro ao consultar imagem existente:", imagemError)
+        return res.status(500).json({
+          error: 'Erro na consulta da imagem existente.',
+          detalhes: imagemError,
+        })
+      }
+
+      if (imagemExistente) {
+        res.status(400).json({ error: 'Imagem de perfil já existe para este funcionário.' })
+        console.log("Imagem de perfil já existe para este funcionário.");
+        return
+      }
+
+      // Ler o arquivo enviado
+      const data = fs.readFileSync(filePath)
+      const hex = '\\x' + data.toString('hex') // bytea no PostgreSQL
+
+      // Inserir no banco de dados
+      const { error: supabaseError } = await supabase
+        .from('imagem_perfil')
+        .insert([
+          {
+            matricula_funcionario,
+            imagem: hex,
+          },
+        ])
+
+      if (supabaseError) {
+        console.log("Erro Supabase Insert:", supabaseError);
+        return res.status(500).json({
+          error: 'Erro ao armazenar no Supabase.',
+          detalhes: supabaseError,
+        })
+      }
+
+      console.log("Upload salvo para funcionário:", matricula_funcionario)
+
+      return res.status(200).json({
+        mensagem: "Imagem enviada com sucesso.",
+        arquivo: req.file.originalname,
+      })
+
+    } catch (error) {
+      console.error("Erro inesperado:", error)
+      return res.status(500).json({ error: 'Erro inesperado no servidor.' })
+    }
+  }
+)
+
+route.put('/uploadImagemPerfil/:matricula_funcionario', upload.single('file'), async (req, res) => {
+  try {
+    const { matricula_funcionario } = req.params
+
+    console.log("Upload recebido para matrícula:", matricula_funcionario)
+    console.log("Arquivo recebido:", req.file?.originalname)
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Nenhum arquivo enviado.' })
+    }
+
+    const filePath = path.join(process.cwd(), 'uploads', req.file.filename)
+
+    // Verificar se o funcionário existe
+    const { data: funcionario, error: funcionarioError } = await supabase
+      .from('funcionario')
+      .select('*')
+      .eq('matricula_funcionario', matricula_funcionario)
+      .single()
+
+    if (funcionarioError) {
+      console.log("Erro ao consultar funcionário:", funcionarioError)
+      return res.status(500).json({
+        error: 'Erro na consulta do funcionário.',
+        detalhes: funcionarioError,
+      })
+    }
+
+    if (!funcionario) {
+      console.log("Funcionário não encontrado.");
+      return res.status(404).json({ error: 'Funcionário não encontrado.' })
+    }
+
+    // Ler o arquivo enviado
+    const data = fs.readFileSync(filePath)
+    const hex = '\\x' + data.toString('hex') // bytea no PostgreSQL
+
+    // Atualizar no banco de dados
+    const { error: supabaseError } = await supabase
+      .from('imagem_perfil')
+      .update({ imagem: hex })
+      .eq('matricula_funcionario', matricula_funcionario)
+
+    if (supabaseError) {
+      console.log("Erro Supabase Update:", supabaseError);
+      return res.status(500).json({
+        error: 'Erro ao atualizar no Supabase.',
+        detalhes: supabaseError,
+      })
+    }
+
+    console.log("Upload atualizado para funcionário:", matricula_funcionario)
+
+    return res.status(200).json({
+      mensagem: "Imagem atualizada com sucesso.",
+      arquivo: req.file.originalname,
+    })
+
+  } catch (error) {
+    console.error("Erro inesperado:", error)
+    return res.status(500).json({ error: 'Erro inesperado no servidor.' })
+  }
+})
+ 
+route.get('/imagemPerfil/:matricula_funcionario', async (req, res) => {
+  try {
+    const { matricula_funcionario } = req.params
+
+    // Buscar a imagem no banco de dados
+    const { data: imagemData, error } = await supabase
+      .from('imagem_perfil')
+      .select('imagem')
+      .eq('matricula_funcionario', matricula_funcionario)
+      .single()
+
+    if (error) {
+      return res.status(500).json({
+        mensagem: 'Erro ao buscar imagem de perfil.',
+        erro: error.message
+      })
+    }
+
+    if (!imagemData) {
+      return res.status(404).json({ mensagem: 'Imagem de perfil não encontrada.' })
+    }
+
+    // Converter o bytea para Buffer
+    const imagemBuffer = Buffer.from(imagemData.imagem.slice(2), 'hex')
+
+    // Definir o tipo de conteúdo e enviar a imagem
+    res.set('Content-Type', 'image/jpeg') // ou o tipo correto da imagem
+    res.send(imagemBuffer)
 
   } catch (err) {
     return res.status(500).json({
@@ -166,5 +374,7 @@ route.get('/diasEspecificos', async (req, res) => {
     })
   }
 })
+
+
 
 export default route
