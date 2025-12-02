@@ -1,6 +1,52 @@
 import express from 'express'
 import supabase from '../../supabase.js'
 import bcrypt from 'bcrypt'
+import PDFDocument from 'pdfkit'
+
+// Função auxiliar para formatar data
+function formatarData(data) {
+  if (!data) return 'Não informado'
+  const d = new Date(data)
+  return d.toLocaleDateString('pt-BR')
+}
+
+// Função auxiliar para obter nome do mês
+function obterNomeMes(mes) {
+  const meses = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ]
+  return meses[mes - 1] || 'Mês inválido'
+}
+
+// Função para adicionar cabeçalho ao PDF
+function adicionarCabecalho(doc, titulo, subtitulo = '') {
+  doc
+    .fontSize(20)
+    .font('Helvetica-Bold')
+    .text(titulo, { align: 'center' })
+    .moveDown(0.5)
+  
+  if (subtitulo) {
+    doc
+      .fontSize(12)
+      .font('Helvetica')
+      .text(subtitulo, { align: 'center' })
+      .moveDown(0.5)
+  }
+  
+  doc
+    .fontSize(10)
+    .text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, { align: 'center' })
+    .moveDown(1)
+  
+  // Linha separadora
+  doc
+    .moveTo(50, doc.y)
+    .lineTo(550, doc.y)
+    .stroke()
+    .moveDown(1)
+}
 
 const route = express.Router()
 
@@ -1492,6 +1538,609 @@ route.post('/cadastrarDiaEspecifico/:matricula_adm', async (req, res) => {
     return res.status(500).json({
       mensagem: 'Erro no servidor',
       erro: err.message
+    })
+  }
+})
+
+
+// RELATÓRIO GERAL DO SETOR
+route.get('/relatorioGeralSetor/:matricula_adm', async (req, res) => {
+  try {
+    const { matricula_adm } = req.params
+    const { mes, ano } = req.query
+
+    if (!mes || !ano) {
+      return res.status(400).json({ 
+        mensagem: 'Mês e ano são obrigatórios. Use ?mes=1&ano=2024' 
+      })
+    }
+
+    const mesNum = parseInt(mes)
+    const anoNum = parseInt(ano)
+
+    if (mesNum < 1 || mesNum > 12) {
+      return res.status(400).json({ mensagem: 'Mês inválido (use 1-12)' })
+    }
+
+    // Buscar setor do ADM
+    const { data: adm, error: errorAdm } = await supabase
+      .from('funcionario')
+      .select('id_setor, nome, setor(nome_setor)')
+      .eq('matricula_funcionario', matricula_adm)
+      .maybeSingle()
+
+    if (errorAdm || !adm) {
+      return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
+    }
+
+    // Buscar todas as equipes do setor
+    const { data: equipes } = await supabase
+      .from('equipe')
+      .select('id_equipe, nome_equipe')
+      .eq('id_setor', adm.id_setor)
+
+    // Buscar todos os funcionários do setor
+    const { data: funcionarios } = await supabase
+      .from('funcionario')
+      .select(`
+        matricula_funcionario, nome, email, telefone, cargo,
+        equipe(nome_equipe),
+        regiao(nome_regiao),
+        escala(tipo_escala, data_inicio, dias_trabalhados, dias_n_trabalhados),
+        turno(inicio_turno, termino_turno, duracao_turno)
+      `)
+      .eq('id_setor', adm.id_setor)
+      .neq('matricula_funcionario', matricula_adm)
+
+    // Buscar dias específicos do mês
+    const primeiroDia = `${anoNum}-${String(mesNum).padStart(2, '0')}-01`
+    const ultimoDia = new Date(anoNum, mesNum, 0).getDate()
+    const ultimoDiaFormatado = `${anoNum}-${String(mesNum).padStart(2, '0')}-${ultimoDia}`
+
+    const { data: diasEspecificos } = await supabase
+      .from('dias_especificos')
+      .select(`
+        matricula_funcionario,
+        nome_diae,
+        data_diae,
+        descricao_diae,
+        funcionario(nome)
+      `)
+      .gte('data_diae', primeiroDia)
+      .lte('data_diae', ultimoDiaFormatado)
+      .in('matricula_funcionario', funcionarios.map(f => f.matricula_funcionario))
+
+    // Criar PDF
+    const doc = new PDFDocument({ margin: 50 })
+    
+    // Configurar headers para download
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader(
+      'Content-Disposition', 
+      `attachment; filename=relatorio_setor_${mesNum}_${anoNum}.pdf`
+    )
+
+    doc.pipe(res)
+
+    // Cabeçalho
+    adicionarCabecalho(
+      doc,
+      'RELATÓRIO GERAL DO SETOR',
+      `${adm.setor?.nome_setor || 'Setor'} - ${obterNomeMes(mesNum)}/${anoNum}`
+    )
+
+    // Informações gerais
+    doc
+      .fontSize(14)
+      .font('Helvetica-Bold')
+      .text('Informações Gerais', { underline: true })
+      .moveDown(0.5)
+      .fontSize(10)
+      .font('Helvetica')
+      .text(`Administrador: ${adm.nome}`)
+      .text(`Total de Equipes: ${equipes?.length || 0}`)
+      .text(`Total de Funcionários: ${funcionarios?.length || 0}`)
+      .moveDown(1)
+
+    // Resumo por equipe
+    doc
+      .fontSize(14)
+      .font('Helvetica-Bold')
+      .text('Resumo por Equipe', { underline: true })
+      .moveDown(0.5)
+
+    for (const equipe of equipes || []) {
+      const funcsEquipe = funcionarios.filter(f => f.equipe?.nome_equipe === equipe.nome_equipe)
+      
+      doc
+        .fontSize(12)
+        .font('Helvetica-Bold')
+        .text(`${equipe.nome_equipe}:`, { continued: true })
+        .font('Helvetica')
+        .text(` ${funcsEquipe.length} funcionário(s)`)
+        .fontSize(10)
+      
+      funcsEquipe.forEach(func => {
+        doc.text(`  • ${func.nome} (${func.matricula_funcionario})`)
+      })
+      
+      doc.moveDown(0.5)
+    }
+
+    doc.moveDown(1)
+
+    // Escalas ativas
+    doc
+      .fontSize(14)
+      .font('Helvetica-Bold')
+      .text('Escalas Ativas', { underline: true })
+      .moveDown(0.5)
+      .fontSize(10)
+      .font('Helvetica')
+
+    const funcComEscala = funcionarios.filter(f => f.escala)
+    
+    if (funcComEscala.length > 0) {
+      funcComEscala.forEach(func => {
+        doc
+          .font('Helvetica-Bold')
+          .text(`${func.nome}:`, { continued: true })
+          .font('Helvetica')
+          .text(` ${func.escala.tipo_escala} (${func.escala.dias_trabalhados}x${func.escala.dias_n_trabalhados})`)
+      })
+    } else {
+      doc.text('Nenhuma escala cadastrada no período')
+    }
+
+    doc.moveDown(1)
+
+    // Dias específicos do mês
+    if (diasEspecificos && diasEspecificos.length > 0) {
+      doc
+        .fontSize(14)
+        .font('Helvetica-Bold')
+        .text('Dias Específicos do Mês', { underline: true })
+        .moveDown(0.5)
+        .fontSize(10)
+        .font('Helvetica')
+
+      diasEspecificos.forEach(dia => {
+        doc
+          .font('Helvetica-Bold')
+          .text(`${formatarData(dia.data_diae)} - ${dia.nome_diae}`, { continued: true })
+          .font('Helvetica')
+          .text(` (${dia.funcionario?.nome || 'N/A'})`)
+          .text(`  ${dia.descricao_diae}`)
+          .moveDown(0.3)
+      })
+    }
+
+    doc.end()
+
+  } catch (error) {
+    return res.status(500).json({ 
+      mensagem: 'Erro ao gerar relatório', 
+      erro: error.message 
+    })
+  }
+})
+
+// RELATÓRIO POR EQUIPE
+route.get('/relatorioPorEquipe/:matricula_adm/:id_equipe', async (req, res) => {
+  try {
+    const { matricula_adm, id_equipe } = req.params
+    const { mes, ano } = req.query
+
+    if (!mes || !ano) {
+      return res.status(400).json({ 
+        mensagem: 'Mês e ano são obrigatórios. Use ?mes=1&ano=2024' 
+      })
+    }
+
+    const mesNum = parseInt(mes)
+    const anoNum = parseInt(ano)
+
+    // Buscar informações da equipe
+    const { data: equipe } = await supabase
+      .from('equipe')
+      .select('nome_equipe, id_setor, setor(nome_setor)')
+      .eq('id_equipe', id_equipe)
+      .single()
+
+    if (!equipe) {
+      return res.status(404).json({ mensagem: 'Equipe não encontrada' })
+    }
+
+    // Buscar funcionários da equipe
+    const { data: funcionarios } = await supabase
+      .from('funcionario')
+      .select(`
+        matricula_funcionario, nome, email, telefone, cargo,
+        regiao(nome_regiao),
+        escala(tipo_escala, data_inicio, dias_trabalhados, dias_n_trabalhados, dias_n_trabalhados_escala_semanal),
+        turno(inicio_turno, termino_turno, duracao_turno, intervalo_turno)
+      `)
+      .eq('id_equipe', id_equipe)
+      .order('nome', { ascending: true })
+
+    // Buscar dias específicos
+    const primeiroDia = `${anoNum}-${String(mesNum).padStart(2, '0')}-01`
+    const ultimoDia = new Date(anoNum, mesNum, 0).getDate()
+    const ultimoDiaFormatado = `${anoNum}-${String(mesNum).padStart(2, '0')}-${ultimoDia}`
+
+    const { data: diasEspecificos } = await supabase
+      .from('dias_especificos')
+      .select('*')
+      .gte('data_diae', primeiroDia)
+      .lte('data_diae', ultimoDiaFormatado)
+      .in('matricula_funcionario', funcionarios.map(f => f.matricula_funcionario))
+
+    // Criar PDF
+    const doc = new PDFDocument({ margin: 50 })
+    
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader(
+      'Content-Disposition', 
+      `attachment; filename=relatorio_equipe_${id_equipe}_${mesNum}_${anoNum}.pdf`
+    )
+
+    doc.pipe(res)
+
+    // Cabeçalho
+    adicionarCabecalho(
+      doc,
+      'RELATÓRIO POR EQUIPE',
+      `${equipe.nome_equipe} - ${obterNomeMes(mesNum)}/${anoNum}`
+    )
+
+    // Informações da equipe
+    doc
+      .fontSize(14)
+      .font('Helvetica-Bold')
+      .text('Informações da Equipe', { underline: true })
+      .moveDown(0.5)
+      .fontSize(10)
+      .font('Helvetica')
+      .text(`Setor: ${equipe.setor?.nome_setor || 'N/A'}`)
+      .text(`Total de Funcionários: ${funcionarios?.length || 0}`)
+      .moveDown(1)
+
+    // Lista de funcionários
+    doc
+      .fontSize(14)
+      .font('Helvetica-Bold')
+      .text('Funcionários', { underline: true })
+      .moveDown(0.5)
+
+    for (const func of funcionarios || []) {
+      doc
+        .fontSize(12)
+        .font('Helvetica-Bold')
+        .text(`${func.nome} (${func.matricula_funcionario})`)
+        .fontSize(10)
+        .font('Helvetica')
+        .text(`Cargo: ${func.cargo || 'Não informado'}`)
+        .text(`Email: ${func.email || 'Não informado'}`)
+        .text(`Telefone: ${func.telefone || 'Não informado'}`)
+        .text(`Região: ${func.regiao?.nome_regiao || 'Não informada'}`)
+
+      if (func.escala) {
+        doc.text(
+          `Escala: ${func.escala.tipo_escala} (${func.escala.dias_trabalhados} dias ON / ${func.escala.dias_n_trabalhados} dias OFF)`
+        )
+        
+        if (func.escala.dias_n_trabalhados_escala_semanal) {
+          const dias = Array.isArray(func.escala.dias_n_trabalhados_escala_semanal) 
+            ? func.escala.dias_n_trabalhados_escala_semanal.join(', ')
+            : func.escala.dias_n_trabalhados_escala_semanal
+          doc.text(`Folgas semanais: ${dias}`)
+        }
+      } else {
+        doc.text('Escala: Não cadastrada')
+      }
+
+      if (func.turno) {
+        doc.text(
+          `Turno: ${func.turno.inicio_turno} às ${func.turno.termino_turno} (${func.turno.duracao_turno}h)`
+        )
+      } else {
+        doc.text('Turno: Não cadastrado')
+      }
+
+      // Dias específicos do funcionário no mês
+      const diasFunc = diasEspecificos?.filter(d => d.matricula_funcionario === func.matricula_funcionario)
+      if (diasFunc && diasFunc.length > 0) {
+        doc
+          .font('Helvetica-Bold')
+          .text('Dias Específicos:')
+          .font('Helvetica')
+        
+        diasFunc.forEach(dia => {
+          doc.text(`  • ${formatarData(dia.data_diae)} - ${dia.nome_diae}: ${dia.descricao_diae}`)
+        })
+      }
+
+      doc.moveDown(1)
+
+      // Adicionar nova página se necessário
+      if (doc.y > 700) {
+        doc.addPage()
+      }
+    }
+
+    doc.end()
+
+  } catch (error) {
+    return res.status(500).json({ 
+      mensagem: 'Erro ao gerar relatório', 
+      erro: error.message 
+    })
+  }
+})
+
+// RELATÓRIO POR FUNCIONÁRIO
+route.get('/relatorioPorFuncionario/:matricula_adm/:matricula_funcionario', async (req, res) => {
+  try {
+    const { matricula_adm, matricula_funcionario } = req.params
+    const { mes, ano } = req.query
+
+    if (!mes || !ano) {
+      return res.status(400).json({ 
+        mensagem: 'Mês e ano são obrigatórios. Use ?mes=1&ano=2024' 
+      })
+    }
+
+    const mesNum = parseInt(mes)
+    const anoNum = parseInt(ano)
+
+    // Buscar setor do ADM
+    const { data: adm } = await supabase
+      .from('funcionario')
+      .select('id_setor')
+      .eq('matricula_funcionario', matricula_adm)
+      .maybeSingle()
+
+    if (!adm) {
+      return res.status(400).json({ mensagem: 'Matrícula do ADM não encontrada' })
+    }
+
+    // Buscar funcionário completo
+    const { data: funcionario } = await supabase
+      .from('funcionario')
+      .select(`
+        matricula_funcionario, nome, email, telefone, cargo,
+        equipe(nome_equipe),
+        regiao(nome_regiao),
+        setor(nome_setor),
+        escala(
+          id_escala, tipo_escala, data_inicio, 
+          dias_trabalhados, dias_n_trabalhados, 
+          dias_n_trabalhados_escala_semanal
+        ),
+        turno(inicio_turno, termino_turno, duracao_turno, intervalo_turno),
+        escala_confirmacao:escala_confirmacao!escala_confirmacao_matricula_funcionario_fkey(
+          id_confirmacao, data_confirmacao, status
+        )
+      `)
+      .eq('matricula_funcionario', matricula_funcionario)
+      .eq('id_setor', adm.id_setor)
+      .maybeSingle()
+
+    if (!funcionario) {
+      return res.status(404).json({ 
+        mensagem: 'Funcionário não encontrado ou não pertence ao setor do ADM' 
+      })
+    }
+
+    // Buscar dias específicos do funcionário no mês
+    const primeiroDia = `${anoNum}-${String(mesNum).padStart(2, '0')}-01`
+    const ultimoDia = new Date(anoNum, mesNum, 0).getDate()
+    const ultimoDiaFormatado = `${anoNum}-${String(mesNum).padStart(2, '0')}-${ultimoDia}`
+
+    const { data: diasEspecificos } = await supabase
+      .from('dias_especificos')
+      .select('*')
+      .eq('matricula_funcionario', matricula_funcionario)
+      .gte('data_diae', primeiroDia)
+      .lte('data_diae', ultimoDiaFormatado)
+      .order('data_diae', { ascending: true })
+
+    // Calcular dias trabalhados no mês (baseado na escala)
+    let diasTrabalhados = 0
+    let diasFolga = 0
+    
+    if (funcionario.escala) {
+      const inicioMes = new Date(anoNum, mesNum - 1, 1)
+      const fimMes = new Date(anoNum, mesNum, 0)
+      const inicioEscala = new Date(funcionario.escala.data_inicio)
+      
+      for (let d = new Date(inicioMes); d <= fimMes; d.setDate(d.getDate() + 1)) {
+        if (d >= inicioEscala) {
+          const diffDias = Math.floor((d - inicioEscala) / (1000 * 60 * 60 * 24))
+          const ciclo = funcionario.escala.dias_trabalhados + funcionario.escala.dias_n_trabalhados
+          const posicao = diffDias % ciclo
+          
+          // Verificar folgas semanais específicas
+          let isFolgaSemanal = false
+          if (funcionario.escala.dias_n_trabalhados_escala_semanal) {
+            const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
+            const diaSemana = diasSemana[d.getDay()].toLowerCase()
+            
+            let diasFolgaSemanal = funcionario.escala.dias_n_trabalhados_escala_semanal
+            if (typeof diasFolgaSemanal === 'string') {
+              try {
+                diasFolgaSemanal = JSON.parse(diasFolgaSemanal)
+              } catch (e) {
+                diasFolgaSemanal = []
+              }
+            }
+            
+            if (Array.isArray(diasFolgaSemanal)) {
+              isFolgaSemanal = diasFolgaSemanal.some(
+                df => String(df).toLowerCase() === diaSemana
+              )
+            }
+          }
+          
+          if (isFolgaSemanal || posicao >= funcionario.escala.dias_trabalhados) {
+            diasFolga++
+          } else {
+            diasTrabalhados++
+          }
+        }
+      }
+    }
+
+    // Criar PDF
+    const doc = new PDFDocument({ margin: 50 })
+    
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader(
+      'Content-Disposition', 
+      `attachment; filename=relatorio_funcionario_${matricula_funcionario}_${mesNum}_${anoNum}.pdf`
+    )
+
+    doc.pipe(res)
+
+    // Cabeçalho
+    adicionarCabecalho(
+      doc,
+      'RELATÓRIO INDIVIDUAL DO FUNCIONÁRIO',
+      `${obterNomeMes(mesNum)}/${anoNum}`
+    )
+
+    // Dados pessoais
+    doc
+      .fontSize(14)
+      .font('Helvetica-Bold')
+      .text('Dados Pessoais', { underline: true })
+      .moveDown(0.5)
+      .fontSize(10)
+      .font('Helvetica')
+      .text(`Nome: ${funcionario.nome}`)
+      .text(`Matrícula: ${funcionario.matricula_funcionario}`)
+      .text(`Email: ${funcionario.email || 'Não informado'}`)
+      .text(`Telefone: ${funcionario.telefone || 'Não informado'}`)
+      .text(`Cargo: ${funcionario.cargo || 'Não informado'}`)
+      .moveDown(1)
+
+    // Dados organizacionais
+    doc
+      .fontSize(14)
+      .font('Helvetica-Bold')
+      .text('Dados Organizacionais', { underline: true })
+      .moveDown(0.5)
+      .fontSize(10)
+      .font('Helvetica')
+      .text(`Setor: ${funcionario.setor?.nome_setor || 'Não informado'}`)
+      .text(`Equipe: ${funcionario.equipe?.nome_equipe || 'Não informada'}`)
+      .text(`Região: ${funcionario.regiao?.nome_regiao || 'Não informada'}`)
+      .moveDown(1)
+
+    // Escala
+    doc
+      .fontSize(14)
+      .font('Helvetica-Bold')
+      .text('Informações da Escala', { underline: true })
+      .moveDown(0.5)
+      .fontSize(10)
+      .font('Helvetica')
+
+    if (funcionario.escala) {
+      doc
+        .text(`Tipo: ${funcionario.escala.tipo_escala}`)
+        .text(`Data de início: ${formatarData(funcionario.escala.data_inicio)}`)
+        .text(`Dias trabalhados: ${funcionario.escala.dias_trabalhados}`)
+        .text(`Dias de folga: ${funcionario.escala.dias_n_trabalhados}`)
+      
+      if (funcionario.escala.dias_n_trabalhados_escala_semanal) {
+        const dias = Array.isArray(funcionario.escala.dias_n_trabalhados_escala_semanal)
+          ? funcionario.escala.dias_n_trabalhados_escala_semanal.join(', ')
+          : funcionario.escala.dias_n_trabalhados_escala_semanal
+        doc.text(`Folgas semanais fixas: ${dias}`)
+      }
+
+      // Confirmação da escala
+      if (funcionario.escala_confirmacao && Array.isArray(funcionario.escala_confirmacao)) {
+        const confirmacao = funcionario.escala_confirmacao[0]
+        if (confirmacao) {
+          doc
+            .font('Helvetica-Bold')
+            .text('Status de Confirmação:', { continued: true })
+            .font('Helvetica')
+            .text(` ${confirmacao.status || 'Pendente'}`)
+          
+          if (confirmacao.data_confirmacao) {
+            doc.text(`Data da confirmação: ${formatarData(confirmacao.data_confirmacao)}`)
+          }
+        }
+      }
+    } else {
+      doc.text('Escala não cadastrada')
+    }
+
+    doc.moveDown(1)
+
+    // Turno
+    doc
+      .fontSize(14)
+      .font('Helvetica-Bold')
+      .text('Informações do Turno', { underline: true })
+      .moveDown(0.5)
+      .fontSize(10)
+      .font('Helvetica')
+
+    if (funcionario.turno) {
+      doc
+        .text(`Início: ${funcionario.turno.inicio_turno}`)
+        .text(`Término: ${funcionario.turno.termino_turno}`)
+        .text(`Duração: ${funcionario.turno.duracao_turno} horas`)
+        .text(`Intervalo: ${funcionario.turno.intervalo_turno} minutos`)
+    } else {
+      doc.text('Turno não cadastrado')
+    }
+
+    doc.moveDown(1)
+
+    // Estatísticas do mês
+    doc
+      .fontSize(14)
+      .font('Helvetica-Bold')
+      .text(`Estatísticas de ${obterNomeMes(mesNum)}/${anoNum}`, { underline: true })
+      .moveDown(0.5)
+      .fontSize(10)
+      .font('Helvetica')
+      .text(`Dias trabalhados: ${diasTrabalhados}`)
+      .text(`Dias de folga: ${diasFolga}`)
+      .text(`Dias específicos cadastrados: ${diasEspecificos?.length || 0}`)
+      .moveDown(1)
+
+    // Dias específicos
+    if (diasEspecificos && diasEspecificos.length > 0) {
+      doc
+        .fontSize(14)
+        .font('Helvetica-Bold')
+        .text('Dias Específicos do Mês', { underline: true })
+        .moveDown(0.5)
+        .fontSize(10)
+        .font('Helvetica')
+
+      diasEspecificos.forEach(dia => {
+        doc
+          .font('Helvetica-Bold')
+          .text(`${formatarData(dia.data_diae)} - ${dia.nome_diae}`)
+          .font('Helvetica')
+          .text(`${dia.descricao_diae}`)
+          .moveDown(0.5)
+      })
+    }
+
+    doc.end()
+
+  } catch (error) {
+    return res.status(500).json({ 
+      mensagem: 'Erro ao gerar relatório', 
+      erro: error.message 
     })
   }
 })
