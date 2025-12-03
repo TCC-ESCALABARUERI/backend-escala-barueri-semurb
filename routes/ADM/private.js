@@ -499,7 +499,7 @@ route.get('/confirmacoesSetor/:matricula_adm', async (req, res) => {
       .eq('id_setor', adm.id_setor)
       .not('id_escala', 'is', null)
       .order('nome', { ascending: true })
-      .maybeSingle()
+      
 
     if (error) return res.status(400).json({ mensagem: 'Erro ao buscar confirmações', erro: error })
 
