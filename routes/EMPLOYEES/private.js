@@ -222,7 +222,7 @@ route.post(
         .from('imagem_perfil')
         .select('*')
         .eq('matricula_funcionario', matricula_funcionario)
-        .single()
+        .maybeSingle()
 
       if (imagemError) {
         console.log("Erro ao consultar imagem existente:", imagemError)
