@@ -186,6 +186,8 @@ route.post('/verificacaoCodigo', async (req, res) => {
       .eq('codigo', codigo)
       .maybeSingle()
 
+      console.log("ERRO: ", error)
+
     if (error)
       return res.status(400).json({ mensagem: 'Erro ao buscar código de verificação', erro: error })
 
