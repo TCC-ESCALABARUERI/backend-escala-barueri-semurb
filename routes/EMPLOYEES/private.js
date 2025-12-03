@@ -19,7 +19,7 @@ const storage = multer.diskStorage({
     }
 });
 
-const upload = multer({ storage });
+const upload = multer({ storage: multer.memoryStorage() });
 
 const route = express.Router()
 
@@ -195,7 +195,7 @@ route.post(
         return res.status(400).json({ error: 'Nenhum arquivo enviado.' })
       }
 
-      const filePath = path.join(process.cwd(), 'uploads', req.file.filename)
+      
 
       // Verificar se o funcionário existe
       const { data: funcionario, error: funcionarioError } = await supabase
@@ -239,7 +239,7 @@ route.post(
       }
 
       // Ler o arquivo enviado
-      const data = fs.readFileSync(filePath)
+      const data = req.file.buffer;
       const hex = '\\x' + data.toString('hex') // bytea no PostgreSQL
 
       // Inserir no banco de dados
@@ -285,7 +285,7 @@ route.put('/uploadImagemPerfil/:matricula_funcionario', upload.single('file'), a
       return res.status(400).json({ error: 'Nenhum arquivo enviado.' })
     }
 
-    const filePath = path.join(process.cwd(), 'uploads', req.file.filename)
+    
 
     // Verificar se o funcionário existe
     const { data: funcionario, error: funcionarioError } = await supabase
@@ -308,7 +308,7 @@ route.put('/uploadImagemPerfil/:matricula_funcionario', upload.single('file'), a
     }
 
     // Ler o arquivo enviado
-    const data = fs.readFileSync(filePath)
+    const data = req.file.buffer;
     const hex = '\\x' + data.toString('hex') // bytea no PostgreSQL
 
     // Atualizar no banco de dados
